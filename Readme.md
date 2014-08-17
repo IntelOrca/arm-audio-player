@@ -28,7 +28,9 @@ Examples of the music formatting can be seen at the bottom of this file. A
 compiler was written in C# to parse the sequence files and generate an assembly
 file defining the binary data representing the music. The notes are formatted as
 follows:
-    <key>[accidential][octave][timing]`
+```
+<key>[accidential][octave][timing]
+```
 
 Key must always be specified... C, D, E, F, G, A, B or ~ for a rest.
 Accidentals can be placed after # for sharp, flat was not implemented. The
