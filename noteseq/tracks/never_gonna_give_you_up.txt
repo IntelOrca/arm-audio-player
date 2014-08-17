@@ -1,0 +1,84 @@
+﻿/* Never gonna give you up */
+@never_gonna_give_you_up:
+%name "Never gonna give you up"
+%bpm 114
+/* Playlist */
+%channel
+  // never_gonna_give_you_up_intro_A0001
+
+  // Chorus
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A02
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A03
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A04
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A02
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A06
+  never_gonna_give_you_up_chorus_A01 never_gonna_give_you_up_chorus_A04
+
+/*
+%channel
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B02
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B03
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B04
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B02
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B06
+  never_gonna_give_you_up_chorus_B01 never_gonna_give_you_up_chorus_B04
+*/
+
+/* Note sequences */
+$never_gonna_give_you_up_intro_A0001:
+F4[1/4] G[1/8] G[1/2]
+G4[3/8] A[1/8] A[1/2] C5[1/16] B4 A[1/8]
+F4[1/4] G[1/8] G[1/2]
+C4[3/8] ~[1/8] ~[1/8] C[1/16] C D F[1/8] F[1/16]
+
+F4[1/4] G[1/8] G[1/2]
+G4[3/8] A[1/8] A[1/2] C5[1/16] B4 A[1/8]
+F4[1/4] G[1/8] G[1/2]
+C4[3/8] ~[1/8] ~[1/8] C[1/16] C D F[1/8] F[1/16]
+
+E4[1/8] F F[1/4] ~ F[1/16] F[1/8] F[1/16]
+
+F4[1/2] F[1/8] G A F
+
+G4[1/8] G G A G[1/4] C[1/4]
+~[1/2] D4[1/8] E F D
+~[1/8] E4 E[1/2]
+
+/* Never gonna (18.5) */
+$never_gonna_give_you_up_chorus_A01:
+C[1/16] D F D
+
+$never_gonna_give_you_up_chorus_B01:
+~[1/4]
+
+/* give you up (19) | make you cry (23) */
+$never_gonna_give_you_up_chorus_A02:
+A4[3/16] A[1/16] A[1/8] G G[1/4]
+
+$never_gonna_give_you_up_chorus_B02:
+E'3[3/16] E'[1/16] E'[1/8] F F[1/4]
+
+/* let you down (20) */
+$never_gonna_give_you_up_chorus_A03:
+G4[3/16] G[1/16] G[1/8] F F[1/16] E F[1/8]
+
+$never_gonna_give_you_up_chorus_B03:
+D3[3/16] D[1/16] D[1/8] G G[1/4]
+
+/* run a round and desert you (21) | tell a lie and hurt you (25) */
+$never_gonna_give_you_up_chorus_A04:
+F4[1/4] G[1/8] E E[1/16] D C[1/4] C[1/8]
+G4[1/4] F[1/2]
+
+$never_gonna_give_you_up_chorus_B04:
+C3[3/8] F[1/8] F[1/4] F
+A3[1/4] G[1/2]
+
+/* say goodbye (24) */
+$never_gonna_give_you_up_chorus_A06:
+C5[1/4] E4[1/8] F F[1/16] E D[1/8]
+
+$never_gonna_give_you_up_chorus_B06:
+D3[1/4] D[1/8] G G[1/4]
+
+

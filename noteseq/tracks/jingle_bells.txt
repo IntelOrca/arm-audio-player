@@ -1,0 +1,52 @@
+﻿/* Jingle bells */
+/* http://gmajormusictheory.org/Freebies/Sing/Jingle/Jingle.pdf */
+@jingle_bells:
+%name "Jingle Bells"
+%bpm 200
+%channel
+  jingle_bells_A01
+  jingle_bells_A17
+  jingle_bells_A21
+  jingle_bells_A23
+  jingle_bells_A17
+  jingle_bells_A21
+  jingle_bells_A31
+
+// 01: Dashing...
+$jingle_bells_A01:
+  D3[1/4] B A G
+  D3[3/4] D[1/8] D
+  D3[1/4] B A G
+  E3[1/1]
+  E3[1/4] C4 B3 A
+  F#3[1/1]
+  D4[1/4] D C A3
+  B3[1/1]
+  D3[1/4] B A G
+  D3[1/1]
+
+  D3[1/4] B A G
+  E3[3/4] E[1/4]
+  E3[1/4] C4 B3 A
+  D4[1/4] D D D
+  E4[1/4] D C A3
+  G3[1/4] ~ D4[1/2]
+
+// 17: Jingle bells... all the way
+$jingle_bells_A17:
+  B3[1/4] B B[1/2]
+  B3[1/4] B B[1/2]
+  B3[1/4] D4 G3[3/8] A[1/8]
+  B3[1/1]
+
+$jingle_bells_A21:
+  C4[1/4] C C C
+  C4[1/4] B3 B B[1/8] B
+
+$jingle_bells_A23:
+  B3[1/4] A A B
+  A3[1/2] D4
+
+$jingle_bells_A31:
+  D4[1/4] D C A3
+  G3[1/1]

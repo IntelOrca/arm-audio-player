@@ -1,0 +1,3118 @@
+KMD
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ;           Project
+00000000:             ; ;           Ted John
+00000000:             ; ;           Version 1.0
+00000000:             ; ;           16 April 2013
+00000000:             ; ;
+00000000:             ; ; This programme is an audio player.
+00000000:             ; ;
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Includes os.s
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ;                INCLUDE ./os.s
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ;           Project
+00000000:             ; ;           Ted John
+00000000:             ; ;           Version 1.4
+00000000:             ; ;           16 April 2013
+00000000:             ; ;
+00000000:             ; ; Operating system
+00000000:             ; ;
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Generic constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; FALSE          EQU     0
+00000000:             ; TRUE           EQU     1
+00000000:             ; 
+00000000:             ; 
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Sector division offsets
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; OFFSET_OS      EQU     &0                                      ; start address for the OS (code
+                      ;  in supervisor mode)
+00000000:             ; OFFSET_IRQ     EQU     &7900                                   ; start address for interupt cod
+                      ; e (IRQ mode)
+00000000:             ; OFFSET_USER    EQU     &8000                                   ; start address for the user cod
+                      ; e (user mode)
+00000000:             ; OFFSET_ENDRAM  EQU     &27C00                                  ; the last available RAM address
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Architecture constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; PSR_CLR_MODE   EQU     &1F
+00000000:             ; PSR_USR        EQU     &10
+00000000:             ; PSR_FIQ        EQU     &11
+00000000:             ; PSR_IRQ        EQU     &12
+00000000:             ; PSR_SVC        EQU     &13
+00000000:             ; PSR_ABT        EQU     &17
+00000000:             ; PSR_UND        EQU     &1B
+00000000:             ; PSR_SYS        EQU     &1F
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; I/O constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; port_area      EQU     &10000000
+00000000:             ; port_LCD_DATA  EQU     &0
+00000000:             ; port_LCD_CTRL  EQU     &4
+00000000:             ; port_BUTTONS   EQU     &4
+00000000:             ; port_TIMER     EQU     &8
+00000000:             ; port_TIMER_CMP EQU     &C
+00000000:             ; port_INT_REQ   EQU     &18
+00000000:             ; port_INT_EN    EQU     &1C
+00000000:             ; 
+00000000:             ; fpga_area      EQU     &20000000
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; BUTTON constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; BTN_1          EQU     (1 << 3)
+00000000:             ; BTN_2          EQU     (1 << 7)
+00000000:             ; BTN_3          EQU     (1 << 6)
+00000000:             ; BTN_MASK       EQU     (BTN_1 | BTN_2 | BTN_3)
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Interrupt constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; INT_TIMER_CMP  EQU     (1 << 0)
+00000000:             ; INT_SPARTAN    EQU     (1 << 1)
+00000000:             ; INT_VIRTEX     EQU     (1 << 2)
+00000000:             ; INT_ETHERNET   EQU     (1 << 3)
+00000000:             ; INT_SERIAL_RR  EQU     (1 << 4)
+00000000:             ; INT_SERIAL_TR  EQU     (1 << 5)
+00000000:             ; INT_BTN_UPPER  EQU     (1 << 6)
+00000000:             ; INT_BTN_LOWER  EQU     (1 << 7)
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Buzzer constants
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; BUZZER_ENABLE_MASK     EQU     &8000
+00000000:             ; 
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ;                ORG     0
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; ; Exception table
+00000000:             ; ;------------------------------------------------------------------------------
+00000000:             ; os_exception_table
+00000000: EA000029    ;                B       os_reset                                ; reset
+00000004: EA000006    ;                B       os_undefined_instruction                ; undefined instruction
+00000008: EA00000A    ;                B       os_svc                                  ; SVC
+0000000C: EA000005    ;                B       os_prefetch_abort                       ; prefetch abort
+00000010: EA000005    ;                B       os_data_abort                           ; data abort
+00000014: EA000005    ;                B       os_trapper_exception                    ; -
+00000018: EA00001A    ;                B       os_irq                                  ; IRQ
+0000001C: EA000004    ;                B       os_fiq                                  ; FIQ
+00000020:             ; 
+00000020:             ; ;------------------------------------------------------------------------------
+00000020:             ; ; Operating system variables
+00000020:             ; ;------------------------------------------------------------------------------
+00000020: 00000000    ; os_tick_count  DEFW    0                                       ; the number of elapsed ms
+00000024:             ; 
+00000024:             ; ;------------------------------------------------------------------------------
+00000024:             ; ; os_undefined_instruction() - trapper
+00000024:             ; ;------------------------------------------------------------------------------
+00000024:             ; os_undefined_instruction
+00000024: EAFFFFFE    ;                B       os_undefined_instruction
+00000028:             ; 
+00000028:             ; ;------------------------------------------------------------------------------
+00000028:             ; ; os_prefetch_abort() - trapper
+00000028:             ; ;------------------------------------------------------------------------------
+00000028:             ; os_prefetch_abort
+00000028: EAFFFFFE    ;                B       os_prefetch_abort
+0000002C:             ; 
+0000002C:             ; ;------------------------------------------------------------------------------
+0000002C:             ; ; os_data_abort() - trapper
+0000002C:             ; ;------------------------------------------------------------------------------
+0000002C:             ; os_data_abort
+0000002C: EAFFFFFE    ;                B       os_data_abort
+00000030:             ; 
+00000030:             ; ;------------------------------------------------------------------------------
+00000030:             ; ; os_trapper_exception() - trapper
+00000030:             ; ;------------------------------------------------------------------------------
+00000030:             ; os_trapper_exception
+00000030: EAFFFFFE    ;                B       os_trapper_exception
+00000034:             ; 
+00000034:             ; ;------------------------------------------------------------------------------
+00000034:             ; ; os_fiq() - trapper
+00000034:             ; ;------------------------------------------------------------------------------
+00000034:             ; os_fiq
+00000034: EAFFFFFE    ;                B       os_fiq
+00000038:             ; 
+00000038:             ; ;------------------------------------------------------------------------------
+00000038:             ; ; SVC CALL TYPES
+00000038:             ; ;------------------------------------------------------------------------------
+00000038:             ; SVC_EXIT               EQU     0
+00000038:             ; SVC_LCD_LIGHT          EQU     1
+00000038:             ; SVC_LCD_CLEAR          EQU     2
+00000038:             ; SVC_LCD_WRITE          EQU     3
+00000038:             ; SVC_LCD_WRITE_CHAR     EQU     4
+00000038:             ; SVC_LCD_SET_CURSOR     EQU     5
+00000038:             ; SVC_LCD_COMMAND        EQU     6
+00000038:             ; SVC_BUZZ_SET           EQU     7
+00000038:             ; SVC_KEYPAD_SCAN        EQU     8
+00000038:             ; 
+00000038:             ; SVC_SVC_COUNT          EQU     9
+00000038:             ; ;------------------------------------------------------------------------------
+00000038:             ; ; os_svc() - Runs a supervisor instruction
+00000038:             ; ;
+00000038:             ; ; R14 - mode
+00000038:             ; ;------------------------------------------------------------------------------
+00000038:             ; os_svc
+00000038: E92D4000    ;                PUSH    {R14}                                   ; push scratch register
+0000003C: E51EE004    ;                LDR     R14, [R14, #-4]                         ; read SVC instruction
+00000040: E3CEE4FF    ;                BIC     R14, R14, #&FF000000                    ; mask off opcode
+00000044: E35E0009    ;                CMP     R14, #SVC_SVC_COUNT                     ; check if SVC instruction exist
+                      ; s
+00000048: 2AFFFFF5    ;                BHS     os_undefined_instruction
+0000004C:             ; os_svc_jump                                                    ; SVC switch
+0000004C: E08FE10E    ;                ADD     R14, PC, R14, LSL #2
+00000050: E59EE010    ;                LDR     R14, [R14, #(os_svc_jumptable-os_svc_jump-8)]
+00000054: E92D4000    ;                PUSH    {R14}
+00000058: E3A0E060    ;                MOV     R14, #os_svc_return
+0000005C: E8BD8000    ;                POP     {PC}
+00000060:             ; os_svc_return
+00000060: E8FD8000    ;                POP     {PC}^
+00000064:             ; os_svc_jumptable                                               ; SVC case jump table
+00000064: 00000108    ;                DEFW    os_exit
+00000068: 00000278    ;                DEFW    lcd_setlight
+0000006C: 00000298    ;                DEFW    lcd_clear
+00000070: 000002A8    ;                DEFW    lcd_putstring
+00000074: 000002C4    ;                DEFW    lcd_putchar
+00000078: 000002EC    ;                DEFW    lcd_setcursor
+0000007C: 00000308    ;                DEFW    lcd_command
+00000080: 00000130    ;                DEFW    buzz_set
+00000084: 000003F8    ;                DEFW    keypad_scan
+00000088:             ; 
+00000088:             ; ;------------------------------------------------------------------------------
+00000088:             ; ; os_irq() - interrupt handler
+00000088:             ; ;------------------------------------------------------------------------------
+00000088:             ; os_irq
+00000088: E24EE004    ;                SUB     LR, LR, #4                              ; Convert return address to inte
+                      ; rrupted instruction address
+0000008C: E92D4007    ;                PUSH    {R0, R1, R2, LR}
+00000090: E3A00201    ;                MOV     R0, #port_area
+00000094: E5901018    ;                LDR     R1, [R0, #port_INT_REQ]                 ; Obtain the interrupt request
+00000098: E3110001    ;                TST     R1, #INT_TIMER_CMP                      ; Test if timer compare
+0000009C: 1B00001A    ;                BLNE    os_update_tick_count
+000000A0: E3A01000    ;                MOV     R1, #0                                  ; Clear the interrupt requests
+000000A4: E5801018    ;                STR     R1, [R0, #port_INT_REQ]
+000000A8: E8FD8007    ;                POP     {R0, R1, R2, PC}^                       ; Return to last code and mode
+000000AC:             ; 
+000000AC:             ; ;------------------------------------------------------------------------------
+000000AC:             ; ; os_reset() - reset the operating system
+000000AC:             ; ;
+000000AC:             ; ; R14 - mode
+000000AC:             ; ;------------------------------------------------------------------------------ 
+000000AC:             ; os_reset
+000000AC: E3A0DC79    ;                MOV     SP, #OFFSET_IRQ                         ; initialise supervisor stack
+000000B0:             ; 
+000000B0: E3A00000    ;                MOV     R0, #0                                  ; initialise os variables
+000000B4: E3A01020    ;                MOV     R1, #os_tick_count
+000000B8: E5010000    ;                STR     R0, [R1]
+000000BC:             ; 
+000000BC: E3A01000    ;                MOV     R1, #0
+000000C0: E3A00201    ;                MOV     R0, #port_area
+000000C4: E5C01004    ;                STRB    R1, [R0, #port_LCD_CTRL]                ; store port value
+000000C8: E3A00202    ;                MOV     R0, #fpga_area
+000000CC: E14010B0    ;                STRH    R1, [R0]                                ; store buzzer output
+000000D0:             ; 
+000000D0: E321F0D2    ;                MSR     CPSR_c, #&D2                            ; change to IRQ mode
+000000D4: E3A0D902    ;                MOV     SP, #OFFSET_USER                        ; initialise interrupt stack
+000000D8: E3A00201    ;                MOV     R0, #port_area
+000000DC: E3A01000    ;                MOV     R1, #0                                  ; clear the interrupt requests
+000000E0: E5801018    ;                STR     R1, [R0, #port_INT_REQ]
+000000E4: E3A01001    ;                MOV     R1, #INT_TIMER_CMP                      ; enable the timer compare inter
+                      ; rupt
+000000E8: E580101C    ;                STR     R1, [R0, #port_INT_EN]
+000000EC: E3A01001    ;                MOV     R1, #1                                  ; set the timer compare to be 1m
+                      ; s
+000000F0: E580100C    ;                STR     R1, [R0, #port_TIMER_CMP]
+000000F4:             ;                
+000000F4: E3A0E050    ;                MOV     R14, #&50                               ; user mode, with interrupts
+000000F8: E16FF00E    ;                MSR     SPSR, R14
+000000FC: E3A0E902    ;                MOV     LR, #OFFSET_USER                        ; set main as the user code entr
+                      ; y point
+00000100: E28EEFE7    ;                ADD     LR, LR, #(main-OFFSET_USER)
+00000104: E1B0F00E    ;                MOVS    PC, LR                                  ; switch to user code
+00000108:             ; 
+00000108:             ; ;------------------------------------------------------------------------------
+00000108:             ; ; os_exit() - ends the program and operating system
+00000108:             ; ;------------------------------------------------------------------------------
+00000108:             ; os_exit
+00000108: EAFFFFFE    ;                B       os_exit
+0000010C:             ; 
+0000010C:             ; ;------------------------------------------------------------------------------
+0000010C:             ; ; os_update_tick_count() - increments the tick count and resets the timer
+0000010C:             ; ;
+0000010C:             ; ; R0 - port area address
+0000010C:             ; ; R1 - ticks
+0000010C:             ; ; R2 - os tick count variable reference
+0000010C:             ; ;------------------------------------------------------------------------------
+0000010C:             ; os_update_tick_count
+0000010C: E92D4007    ;                PUSH    {R0, R1, R2, LR}
+00000110: E3A02020    ;                MOV     R2, #os_tick_count
+00000114: E3A00201    ;                MOV     R0, #port_area
+00000118: E3A01000    ;                MOV     R1, #0                                  ; Clear the timer
+0000011C: E5801008    ;                STR     R1, [R0, #port_TIMER]
+00000120: E5121000    ;                LDR     R1, [R2]                                ; Increment the OS tick count
+00000124: E2811001    ;                ADD     R1, R1, #1
+00000128: E5021000    ;                STR     R1, [R2]
+0000012C: E8BD8007    ;                POP     {R0, R1, R2, PC}
+00000130:             ; 
+00000130:             ; ;------------------------------------------------------------------------------
+00000130:             ; ; buzz_set() - sets the buzzer to play a certain frequency
+00000130:             ; ;
+00000130:             ; ; I  R0 - time period
+00000130:             ; ; I  R1 - port
+00000130:             ; ;    R2 - general purpose value
+00000130:             ; ;------------------------------------------------------------------------------
+00000130:             ; buzz_set
+00000130: E92D400C    ;                PUSH    {R2, R3, LR}
+00000134: E3A02202    ;                MOV     R2, #fpga_area                          ; get port address
+00000138: E0822101    ;                ADD     R2, R2, R1 LSL #2
+0000013C: E1A03420    ;                MOV     R3, R0, LSR #8                          ; store high
+00000140: E5C23001    ;                STRB    R3, [R2, #1]
+00000144: E5C20000    ;                STRB    R0, [R2, #0]
+00000148: E8BD800C    ;                POP     {R2, R3, PC}
+0000014C:             ; 
+0000014C:             ; ;------------------------------------------------------------------------------
+0000014C:             ; ; memset() - sets a number of bytes to a value
+0000014C:             ; ; I  R0 - address
+0000014C:             ; ; I  R1 - value
+0000014C:             ; ; I  R2 - length
+0000014C:             ; ;------------------------------------------------------------------------------
+0000014C:             ; memset
+0000014C: E92D4005    ;                PUSH    {R0, R2, LR}
+00000150:             ; 
+00000150:             ; memset_loop
+00000150: E3520001    ;                CMP     R2, #1
+00000154: A4C01001    ;                STRGEB  R1, [R0], #1
+00000158: A2422001    ;                SUBGE   R2, R2, #1
+0000015C: AAFFFFFB    ;                BGE     memset_loop
+00000160: E8BD8005    ;                POP     {R0, R2, PC}
+00000164:             ; 
+00000164:             ; ;------------------------------------------------------------------------------
+00000164:             ; ; has_elapsed_by()
+00000164:             ; ;
+00000164:             ; ; IO R0 - address of tick save, output true if so otherwise false
+00000164:             ; ; I  R1 - number of ticks
+00000164:             ; ;
+00000164:             ; ;    R2 - current tick count
+00000164:             ; ;    R3 - last tick count / elapsed
+00000164:             ; ;------------------------------------------------------------------------------
+00000164:             ; has_elapsed_by
+00000164: E92D400C    ;                PUSH    {R2, R3, LR}
+00000168: E3A02020    ;                MOV     R2, #os_tick_count                      ; get current tick
+0000016C: E5122000    ;                LDR     R2, [R2]
+00000170: E5103000    ;                LDR     R3, [R0]                                ; get last tick
+00000174: E0423003    ;                SUB     R3, R2, R3                              ; get elapsed ticks
+00000178: E1530001    ;                CMP     R3, R1                                  ; check if elapsed ticks > R1
+0000017C: B3A00000    ;                MOVLT   R0, #FALSE
+00000180: BA000001    ;                BLT     has_elapsed_by_return
+00000184: E5002000    ;                STR     R2, [R0]                                ; set last tick
+00000188: E3A00001    ;                MOV     R0, #TRUE
+0000018C:             ; has_elapsed_by_return
+0000018C: E8BD800C    ;                POP     {R2, R3, PC}
+00000190:             ; 
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ;                INCLUDE lcd.s
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; ;           LCD functions
+00000190:             ; ;           Ted John
+00000190:             ; ;           Version 1.2
+00000190:             ; ;           16 April 2013
+00000190:             ; ;
+00000190:             ; ; Functions for interfacing with the LCD.
+00000190:             ; ;
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; ; Requires os.s
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; 
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; ; LCD constants
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; LCD_E          EQU     (1 << 0)
+00000190:             ; LCD_RS         EQU     (1 << 1)
+00000190:             ; LCD_RW         EQU     (1 << 2)
+00000190:             ; LCD_BACKLIGHT  EQU     (1 << 5)
+00000190:             ; LCD_BUSY       EQU     (1 << 7)
+00000190:             ; 
+00000190:             ; LCD_CMD_CLEAR  EQU     &1
+00000190:             ; LCD_CMD_SETCUR EQU     &80
+00000190:             ; 
+00000190:             ; LCD_CHARS_VISIBLE_PER_LINE       EQU     16
+00000190:             ; LCD_CHARS_PER_LINE               EQU     64
+00000190:             ; 
+00000190:             ; LCD_CHARWRITE  EQU     (1 << 31)
+00000190:             ; 
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; ; LCD_SCROLLER - structure for scrolling text along a line in the LCD
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; RECORD
+00000190:             ; LCD_SCROLLER_TEXT                BYTE        256
+00000190:             ; LCD_SCROLLER_BUFFER              BYTE        LCD_CHARS_VISIBLE_PER_LINE
+00000190:             ; LCD_SCROLLER_X                   WORD
+00000190:             ; LCD_SCROLLER_Y                   WORD
+00000190:             ; LCD_SCROLLER_TEXT_LEN            WORD
+00000190:             ; LCD_SCROLLER_SIZE                WORD
+00000190:             ; 
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; ; lcd_scroller_set_text()
+00000190:             ; ;
+00000190:             ; ; I  R0 - lcd_scroller address
+00000190:             ; ; I  R1 - y
+00000190:             ; ;------------------------------------------------------------------------------
+00000190:             ; lcd_scroller_init
+00000190: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+00000194: E1A03001    ;                MOV     R3, R1
+00000198: E3A01000    ;                MOV     R1, #0
+0000019C: E3A02F47    ;                MOV     R2, #LCD_SCROLLER_SIZE
+000001A0: EBFFFFE9    ;                BL      memset
+000001A4: E5803114    ;                STR     R3, [R0, #LCD_SCROLLER_Y]
+000001A8: E8BD800E    ;                POP     {R1, R2, R3, PC}
+000001AC:             ; 
+000001AC:             ; ;------------------------------------------------------------------------------
+000001AC:             ; ; lcd_scroller_set_text()
+000001AC:             ; ;
+000001AC:             ; ; I  R0 - lcd_scroller address
+000001AC:             ; ; I  R1 - source text address
+000001AC:             ; ;------------------------------------------------------------------------------
+000001AC:             ; lcd_scroller_set_text
+000001AC: E92D400F    ;                PUSH    {R0, R1, R2, R3, LR}
+000001B0: E1A03000    ;                MOV     R3, R0
+000001B4:             ;                
+000001B4: E2832000    ;                ADD     R2, R3, #LCD_SCROLLER_TEXT              ; destination text
+000001B8:             ;                
+000001B8: E1A00002    ;                MOV     R0, R2
+000001BC: EB0000BF    ;                BL      strcpy
+000001C0: EB0000A9    ;                BL      strlen                                  ; save text length
+000001C4: E1A01000    ;                MOV     R1, R0
+000001C8: E5821118    ;                STR     R1, [R2, #LCD_SCROLLER_TEXT_LEN]
+000001CC:             ;                
+000001CC: E0810002    ;                ADD     R0, R1, R2                              ; end of string address
+000001D0: E2612C01    ;                RSB     R2, R1, #&100                           ; length of memory
+000001D4: E3A01000    ;                MOV     R1, #0                                  ; value
+000001D8: EBFFFFDB    ;                BL      memset
+000001DC:             ;                
+000001DC: E3A00000    ;                MOV     R0, #0                                  ; reset x position
+000001E0: E5830110    ;                STR     R0, [R3, #LCD_SCROLLER_X]
+000001E4: E1A00003    ;                MOV     R0, R3                                  ; update the scroller
+000001E8: EB000000    ;                BL      lcd_scroller_update
+000001EC: E8BD800F    ;                POP     {R0, R1, R2, R3, PC}
+000001F0:             ; 
+000001F0:             ; ;------------------------------------------------------------------------------
+000001F0:             ; ; lcd_scroller_update()
+000001F0:             ; ;
+000001F0:             ; ; I  R0 - lcd_scroller address
+000001F0:             ; ;
+000001F0:             ; ;    R0 - general purpose
+000001F0:             ; ;    R1 - destination character
+000001F0:             ; ;    R2 - text address
+000001F0:             ; ;    R3 - buffer address
+000001F0:             ; ;    R4 - lcd_scoller address
+000001F0:             ; ;    R5 - buffer x position
+000001F0:             ; ;    R6 - buffer y position
+000001F0:             ; ;    R7 - source character
+000001F0:             ; ;------------------------------------------------------------------------------
+000001F0:             ; lcd_scroller_update
+000001F0: E92D40FF    ;                PUSH    {R0, R1, R2, R3, R4, R5, R6, R7, LR}
+000001F4: E1A04000    ;                MOV     R4, R0
+000001F8:             ;                
+000001F8: E3A05000    ;                MOV     R5, #0                                  ; set buffer x to 0
+000001FC: E5946114    ;                LDR     R6, [R4, #LCD_SCROLLER_Y]               ; get y position (line index)
+00000200: E2842000    ;                ADD     R2, R4, #LCD_SCROLLER_TEXT              ; get text address (R2)
+00000204: E5940110    ;                LDR     R0, [R4, #LCD_SCROLLER_X]               ; skip x characters
+00000208: E0822000    ;                ADD     R2, R2, R0
+0000020C: E2843C01    ;                ADD     R3, R4, #LCD_SCROLLER_BUFFER            ; get buffer cache address (R3)
+00000210:             ;                
+00000210:             ; lcd_scroller_update_loop
+00000210: E5527000    ;                LDRB    R7, [R2]                                ; get source character
+00000214: E5531000    ;                LDRB    R1, [R3]                                ; get destination character
+00000218: E1570001    ;                CMP     R7, R1                                  ; check if we need to update buf
+                      ; fer
+0000021C: 0A000005    ;                BEQ     lcd_scroller_update_next
+00000220:             ;                
+00000220: E1A00005    ;                MOV     R0, R5                                  ; x position
+00000224: E1A01006    ;                MOV     R1, R6            
+00000228: EF000005    ;                SVC     SVC_LCD_SET_CURSOR
+0000022C: E1A00007    ;                MOV     R0, R7                                  ; character to write
+00000230: EF000004    ;                SVC     SVC_LCD_WRITE_CHAR               
+00000234: E5437000    ;                STRB    R7, [R3]                                ; update buffer cache
+00000238:             ;                
+00000238:             ; lcd_scroller_update_next
+00000238: E2822001    ;                ADD     R2, R2, #1                              ; next character
+0000023C: E2833001    ;                ADD     R3, R3, #1
+00000240: E2855001    ;                ADD     R5, R5, #1
+00000244: E3550010    ;                CMP     R5, #LCD_CHARS_VISIBLE_PER_LINE         ; check if whole buffer has been
+                      ;  updated
+00000248: BAFFFFF0    ;                BLT     lcd_scroller_update_loop
+0000024C:             ;                
+0000024C:             ; lcd_scroller_update_end
+0000024C: E5940118    ;                LDR     R0, [R4, #LCD_SCROLLER_TEXT_LEN]        ; get string length
+00000250: E3500010    ;                CMP     R0, #LCD_CHARS_VISIBLE_PER_LINE         ; no scrolling if text length < 
+                      ; LCD_CHARS_VISIBLE_PER_LINE
+00000254: DA000006    ;                BLE     lcd_scroller_update_return
+00000258:             ; 
+00000258: E240000F    ;                SUB     R0, R0, #(LCD_CHARS_VISIBLE_PER_LINE-1) ; give some spaces after the str
+                      ; ing when scrolling
+0000025C: E5941110    ;                LDR     R1, [R4, #LCD_SCROLLER_X]               ; get current x
+00000260: E2811001    ;                ADD     R1, R1, #1                              ; increment current x
+00000264: E1510000    ;                CMP     R1, R0                                  ; check if ready to reset x
+00000268: BA000000    ;                BLT     lcd_scroller_update_save_x
+0000026C: E3A01000    ;                MOV     R1, #0                                  ; reset x
+00000270:             ; lcd_scroller_update_save_x
+00000270: E5841110    ;                STR     R1, [R4, #LCD_SCROLLER_X]               ; set current x
+00000274:             ; lcd_scroller_update_return
+00000274: E8BD80FF    ;                POP     {R0, R1, R2, R3, R4, R5, R6, R7, PC}
+00000278:             ; 
+00000278:             ; ;------------------------------------------------------------------------------
+00000278:             ; ; lcd_setlight() - sets the backlight of the LCD to either on or off
+00000278:             ; ;
+00000278:             ; ; I  R0 - TRUE to turn the backlight on, FALSE to turn it off
+00000278:             ; ;    R1 - port area
+00000278:             ; ;    R2 - port area value
+00000278:             ; ;------------------------------------------------------------------------------
+00000278:             ; lcd_setlight
+00000278: E92D4006    ;                PUSH    {R1, R2, LR}
+0000027C: E3A01201    ;                MOV     R1, #port_area
+00000280: E5D12004    ;                LDRB    R2, [R1, #port_LCD_CTRL]               ; load port value
+00000284: E3500000    ;                CMP     R0, #FALSE                             ; set backlight bit based on argu
+                      ; ment
+00000288: 13822020    ;                ORRNE   R2, R2, #LCD_BACKLIGHT
+0000028C: 03C22020    ;                BICEQ   R2, R2, #LCD_BACKLIGHT
+00000290: E5C12004    ;                STRB    R2, [R1, #port_LCD_CTRL]               ; store port value
+00000294: E8BD8006    ;                POP     {R1, R2, PC}
+00000298:             ; 
+00000298:             ; ;------------------------------------------------------------------------------
+00000298:             ; ; lcd_clear() - clears the LCD display
+00000298:             ; ;
+00000298:             ; ;    R0 - command
+00000298:             ; ;------------------------------------------------------------------------------
+00000298:             ; lcd_clear
+00000298: E92D4001    ;                PUSH    {R0, LR}
+0000029C: E3A00001    ;                MOV     R0, #LCD_CMD_CLEAR
+000002A0: EB000018    ;                BL      lcd_command
+000002A4: E8BD8001    ;                POP     {R0, PC}
+000002A8:             ; 
+000002A8:             ; ;------------------------------------------------------------------------------
+000002A8:             ; ; lcd_putstring() - writes a null terminated string to the LCD
+000002A8:             ; ;
+000002A8:             ; ; I  R0 - address of string (first character)
+000002A8:             ; ;    R0 - current character value
+000002A8:             ; ;    R1 - address of character position
+000002A8:             ; ;------------------------------------------------------------------------------
+000002A8:             ; lcd_putstring
+000002A8: E92D4003    ;                PUSH    {R0, R1, LR}
+000002AC: E1A01000    ;                MOV     R1, R0                                  ; use another register for strin
+                      ; g address
+000002B0:             ; lcd_putstring_loop
+000002B0: E4D10001    ;                LDRB    R0, [R1], #1                            ; read character
+000002B4: E3500000    ;                CMP     R0, #0                                  ; check if null terminator reach
+                      ; ed
+000002B8: 08BD8003    ;                POPEQ   {R0, R1, PC}                            ; return
+000002BC: E24FE014    ;                ADR     LR, lcd_putstring_loop                  ; write the character and then l
+                      ; oop
+000002C0: EAFFFFFF    ;                B       lcd_putchar
+000002C4:             ; 
+000002C4:             ; ;------------------------------------------------------------------------------
+000002C4:             ; ; lcd_putchar() - writes an ascii character to the LCD
+000002C4:             ; ;
+000002C4:             ; ; I  R0 - ascii character to write
+000002C4:             ; ;------------------------------------------------------------------------------
+000002C4:             ; lcd_putchar
+000002C4: E92D4001    ;                PUSH    {R0, LR}
+000002C8: E3500000    ;                CMP     R0, #0                                  ; change char 0 to space
+000002CC: 03A00020    ;                MOVEQ   R0, #' '
+000002D0: E3800102    ;                ORR     R0, R0, #LCD_CHARWRITE                  ; set write character flag
+000002D4: EB00000B    ;                BL      lcd_command
+000002D8: E8BD8001    ;                POP     {R0, PC}
+000002DC:             ; 
+000002DC:             ; ;------------------------------------------------------------------------------
+000002DC:             ; ; lcd_setcursor() - sets the LCD cursor position
+000002DC:             ; ;
+000002DC:             ; ; I  R0 - x position
+000002DC:             ; ; I  R1 - y position
+000002DC:             ; ;------------------------------------------------------------------------------
+000002DC:             ; lcd_setcursor_line_offsets                                     ; lookup table for line start of
+                      ; fsets
+000002DC: 00000000    ;                DEFW    (LCD_CHARS_PER_LINE * 0)
+000002E0: 00000040    ;                DEFW    (LCD_CHARS_PER_LINE * 1)
+000002E4: 00000080    ;                DEFW    (LCD_CHARS_PER_LINE * 2)
+000002E8: 000000C0    ;                DEFW    (LCD_CHARS_PER_LINE * 3)
+000002EC:             ; lcd_setcursor
+000002EC: E92D4005    ;                PUSH    {R0, R2, LR}
+000002F0: E24F201C    ;                ADRL    R2, lcd_setcursor_line_offsets          ; get line start offset
+000002F4: E7922101    ;                LDR     R2, [R2, R1 LSL #2]
+000002F8: E0822000    ;                ADD     R2, R2, R0                              ; add x position
+000002FC: E2820080    ;                ADD     R0, R2, #LCD_CMD_SETCUR                 ; produce lcd command
+00000300: EB000000    ;                BL      lcd_command
+00000304: E8BD8005    ;                POP     {R0, R2, PC}
+00000308:             ; 
+00000308:             ; ;------------------------------------------------------------------------------
+00000308:             ; ; lcd_command() - sends a command or character to the LCD
+00000308:             ; ;
+00000308:             ; ; I  R0 - command (set bit LCD_CHARWRITE for character write)
+00000308:             ; ;    R1 - port area address
+00000308:             ; ;    R2 - data register
+00000308:             ; ;------------------------------------------------------------------------------
+00000308:             ; lcd_command
+00000308: E92D4006    ;                PUSH    {R1, R2, LR}
+0000030C: E3A01201    ;                MOV     R1, #port_area                          ; keep port address in R1
+00000310: EB00000B    ;                BL      lcd_wait_until_ready
+00000314: E5D12004    ;                LDRB    R2, [R1, #port_LCD_CTRL]                ; read from control port
+00000318: E3C22004    ;                BIC     R2, R2, #LCD_RW                         ; set write signal
+0000031C:             ; 
+0000031C: E3100102    ;                TST     R0, #LCD_CHARWRITE                      ; test command / character flag
+00000320: 13822002    ;                ORRNE   R2, R2, #LCD_RS                         ;   set data port IO
+00000324: 03C22002    ;                BICEQ   R2, R2, #LCD_RS                         ;   set control port IO
+00000328:             ; 
+00000328: E5C12004    ;                STRB    R2, [R1, #port_LCD_CTRL]                ;     write to control port
+0000032C: E5C10000    ;                STRB    R0, [R1, #port_LCD_DATA]                ; write data port
+00000330: E3822001    ;                ORR     R2, R2, #LCD_E                          ; enable bus
+00000334: E5C12004    ;                STRB    R2, [R1, #port_LCD_CTRL]                ;   write to control port
+00000338: E3C22001    ;                BIC     R2, R2, #LCD_E                          ; disable bus
+0000033C: E5C12004    ;                STRB    R2, [R1, #port_LCD_CTRL]                ;   write to control port
+00000340: E8BD8006    ;                POP     {R1, R2, PC}
+00000344:             ; 
+00000344:             ; ;------------------------------------------------------------------------------
+00000344:             ; ; lcd_wait_until_ready() - waits until the LCD display is ready
+00000344:             ; ;
+00000344:             ; ;    R0 - port area address
+00000344:             ; ;    R1 - control register
+00000344:             ; ;    R2 - data register
+00000344:             ; ;------------------------------------------------------------------------------
+00000344:             ; lcd_wait_until_ready
+00000344: E92D4007    ;                PUSH    {R0, R1, R2, LR}
+00000348: E3A00201    ;                MOV     R0, #port_area                          ; keep port address in R0
+0000034C: E5D01004    ;                LDRB    R1, [R0, #port_LCD_CTRL]                ; read control port
+00000350: E3811004    ;                ORR     R1, R1, #LCD_RW                         ; set read signal
+00000354: E3C11002    ;                BIC     R1, R1, #LCD_RS                         ; set control register
+00000358: E5C01004    ;                STRB    R1, [R0, #port_LCD_CTRL]                ;   write control port
+0000035C:             ; lcd_wait_until_ready_loop
+0000035C: E3811001    ;                ORR     R1, R1, #LCD_E                          ; enable bus
+00000360: E5C01004    ;                STRB    R1, [R0, #port_LCD_CTRL]                ;   write control port
+00000364: E5D02000    ;                LDRB    R2, [R0, #port_LCD_DATA]                ; read data port
+00000368: E3C11001    ;                BIC     R1, R1, #LCD_E                          ; disable bus
+0000036C: E5C01004    ;                STRB    R1, [R0, #port_LCD_CTRL]                ;   write control port
+00000370: E3120080    ;                TST     R2, #LCD_BUSY                           ; test busy bit
+00000374: 1AFFFFF8    ;                BNE     lcd_wait_until_ready_loop
+00000378: E8BD8007    ;                POP     {R0, R1, R2, PC}
+0000037C:             ; 
+0000037C:             ;                INCLUDE keypad.s
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; ;           Keypad peripheral functions
+0000037C:             ; ;           Ted John
+0000037C:             ; ;           Version 1.0
+0000037C:             ; ;           26th February 2013
+0000037C:             ; ;
+0000037C:             ; ; Functions for reading the keys.
+0000037C:             ; ;
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; ; Requires os.s
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; 
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; ; Keypad constants
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; KEYPAD_ROW_1   EQU     (1 << 0)
+0000037C:             ; KEYPAD_ROW_2   EQU     (1 << 1)
+0000037C:             ; KEYPAD_ROW_3   EQU     (1 << 2)
+0000037C:             ; KEYPAD_ROW_4   EQU     (1 << 3)
+0000037C:             ; KEYPAD_UNKOWN  EQU     (1 << 4)
+0000037C:             ; KEYPAD_COL_3   EQU     (1 << 5)
+0000037C:             ; KEYPAD_COL_2   EQU     (1 << 6)
+0000037C:             ; KEYPAD_COL_1   EQU     (1 << 7)
+0000037C:             ; KEYPAD_ROWS    EQU     (KEYPAD_ROW_1 | KEYPAD_ROW_2 | KEYPAD_ROW_3 | KEYPAD_ROW_4)
+0000037C:             ; KEYPAD_COLS    EQU     (KEYPAD_COL_1 | KEYPAD_COL_2 | KEYPAD_COL_3)
+0000037C:             ; 
+0000037C:             ; KEYPAD_NOBUTTON        EQU     -1
+0000037C:             ; KEYPAD_IDX_ASTERISK    EQU     9
+0000037C:             ; KEYPAD_IDX_0           EQU     10
+0000037C:             ; KEYPAD_IDX_HASH        EQU     11
+0000037C:             ; 
+0000037C:             ; ;------------------------------------------------------------------------------
+0000037C:             ; keypad_variables
+0000037C: 20000000    ; keypad_port    DEFW    fpga_area
+00000380:             ; 
+00000380:             ; keypad_button_index_table
+00000380: 00 03 06 09 ;                DEFB 0, 3, 6,  9
+00000384: 01 04 07 0A ;                DEFB 1, 4, 7, 10
+00000388: 02 05 08 0B ;                DEFB 2, 5, 8, 11
+0000038C:             ; 
+0000038C:             ; keypad_ascii_table
+0000038C: 31 32 33    ;                DEFB '1', '2', '3'
+0000038F: 34 35 36    ;                DEFB '4', '5', '6'
+00000392: 37 38 39    ;                DEFB '7', '8', '9'
+00000395: 2A 30 23    ;                DEFB '*', '0', '#'
+00000398:             ; 
+00000398:             ; ;------------------------------------------------------------------------------
+00000398:             ; ; keypad_get_new_presses()
+00000398:             ; ;
+00000398:             ; ; IO R0 - last scan (output new keys)
+00000398:             ; ; I  R1 - new scan
+00000398:             ; ;------------------------------------------------------------------------------
+00000398:             ; keypad_get_new_presses
+00000398: E0200001    ;                EOR     R0, R0, R1
+0000039C: E0000001    ;                AND     R0, R0, R1
+000003A0: E1A0F00E    ;                MOV     PC, LR
+000003A4:             ; 
+000003A4:             ; ;------------------------------------------------------------------------------
+000003A4:             ; ; keypad_button_index_to_ascii() - returns the ascii character for the
+000003A4:             ; ;                                  specified button index
+000003A4:             ; ;
+000003A4:             ; ; IO R0 - index (ouput ascii)
+000003A4:             ; ;------------------------------------------------------------------------------
+000003A4:             ; keypad_button_index_to_ascii
+000003A4: E3700001    ;                CMP     R0, #KEYPAD_NOBUTTON
+000003A8: 03A00000    ;                MOVEQ   R0, #0
+000003AC: 01A0F00E    ;                MOVEQ   PC, LR
+000003B0: E2800FE3    ;                ADD     R0, R0, #keypad_ascii_table
+000003B4: E5500000    ;                LDRB    R0, [R0]
+000003B8: E1A0F00E    ;                MOV     PC, LR
+000003BC:             ; 
+000003BC:             ; ;------------------------------------------------------------------------------
+000003BC:             ; ; keypad_scan_read_index() - returns the button index for the first found
+000003BC:             ; ;                            corresponding bit, the bit is then cleared
+000003BC:             ; ;
+000003BC:             ; ; IO R0 - scan (output with first found bit cleared)
+000003BC:             ; ;  O R1 - bit index (output button index)
+000003BC:             ; ;    R2 - bit mask
+000003BC:             ; ;------------------------------------------------------------------------------
+000003BC:             ; keypad_scan_read_index
+000003BC: E92D4004    ;                PUSH    {R2, LR}
+000003C0: E3A01000    ;                MOV     R1, #0                                  ; initialise index and mask
+000003C4: E3A02001    ;                MOV     R2, #1
+000003C8:             ; keypad_scan_read_ascii_loop
+000003C8: E1100002    ;                TST     R0, R2                                  ; test scan bit
+000003CC: 1A000005    ;                BNE     keypad_scan_read_ascii_found
+000003D0: E351000B    ;                CMP     R1, #11                                 ; check if all bits have been te
+                      ; sted
+000003D4: 03E01000    ;                MOVEQ   R1, #KEYPAD_NOBUTTON
+000003D8: 08BD8004    ;                POPEQ   {R2, PC}
+000003DC: E2811001    ;                ADD     R1, R1, #1                              ; increment index and mask
+000003E0: E1A02082    ;                MOV     R2, R2, LSL #1
+000003E4: EAFFFFF7    ;                B       keypad_scan_read_ascii_loop
+000003E8:             ; keypad_scan_read_ascii_found
+000003E8: E1C00002    ;                BIC     R0, R0, R2                              ; clear tested bit
+000003EC: E2811D0E    ;                ADD     R1, R1, #keypad_button_index_table
+000003F0: E5511000    ;                LDRB    R1, [R1]
+000003F4: E8BD8004    ;                POP     {R2, PC}
+000003F8:             ; 
+000003F8:             ; ;------------------------------------------------------------------------------
+000003F8:             ; ; keypad_scan() - scans the keypad and updates the changed key states
+000003F8:             ; ;
+000003F8:             ; ;  O R0 - result scan (output)
+000003F8:             ; 
+000003F8:             ; ;    R1 - scan shift
+000003F8:             ; ;    R2 - control bits
+000003F8:             ; ;    R3 - port
+000003F8:             ; ;    R4 - data bits
+000003F8:             ; ;------------------------------------------------------------------------------
+000003F8:             ; keypad_scan
+000003F8: E92D401E    ;                PUSH    {R1, R2, R3, R4, LR}
+000003FC:             ; 
+000003FC: E51F3088    ;                LDR     R3, keypad_port
+00000400: E3A0201F    ;                MOV     R2, #(KEYPAD_ROWS | KEYPAD_UNKOWN)      ; Set everything to input apart 
+                      ; from the column selectors
+00000404: E5C32003    ;                STRB    R2, [R3, #3]
+00000408:             ; 
+00000408: E3A00000    ;                MOV     R0, #0                                  ; Initialise result scan
+0000040C: E3A01000    ;                MOV     R1, #0
+00000410: E3A02080    ;                MOV     R2, #KEYPAD_COL_1
+00000414:             ; keypad_scan_loop
+00000414: E5C32002    ;                STRB    R2, [R3, #2]                            ; Store output control bits (col
+                      ; umn selector)
+00000418: E5D34002    ;                LDRB    R4, [R3, #2]                            ; Load data bits
+0000041C: E204400F    ;                AND     R4, R4, #KEYPAD_ROWS                    ; Place it into the scan result
+00000420: E1A04114    ;                MOV     R4, R4, LSL R1
+00000424: E1800004    ;                ORR     R0, R0, R4
+00000428: E3520020    ;                CMP     R2, #KEYPAD_COL_3                       ; Check if all columns have been
+                      ;  scanned
+0000042C: 11A020A2    ;                MOVNE   R2, R2, LSR #1                          ; Select next column
+00000430: 12811004    ;                ADDNE   R1, R1, #4
+00000434: 1AFFFFF6    ;                BNE     keypad_scan_loop
+00000438: E8BD801E    ;                POP     {R1, R2, R3, R4, PC}
+0000043C:             ; 
+0000043C:             ;                INCLUDE math.s
+0000043C:             ; ;------------------------------------------------------------------------------
+0000043C:             ; ;           Maths functions
+0000043C:             ; ;           Ted John
+0000043C:             ; ;           Version 1.0
+0000043C:             ; ;           12th February 2013
+0000043C:             ; ;
+0000043C:             ; ; Functions for any mathematical functions.
+0000043C:             ; ;
+0000043C:             ; ;------------------------------------------------------------------------------
+0000043C:             ; 
+0000043C:             ; ;------------------------------------------------------------------------------
+0000043C:             ; ; udivision() - performs an unsigned division, taken from example
+0000043C:             ; ;               by J.G.
+0000043C:             ; ;
+0000043C:             ; ; IO R0 - numerator (updated to quotient)
+0000043C:             ; ; I  R1 - denominator
+0000043C:             ; ; O  R2 - remainder (output only)
+0000043C:             ; ;
+0000043C:             ; ; R3 - loop counter
+0000043C:             ; ;------------------------------------------------------------------------------
+0000043C:             ; udivision
+0000043C: E92D4008    ;                PUSH    {R3, LR}
+00000440:             ; 
+00000440: E3A02000    ;                MOV     R2, #0                                  ; AccH
+00000444: E3A03020    ;                MOV     R3, #32                                 ; Number of bits in division
+00000448: E0900000    ;                ADDS    R0, R0, R0                              ; Shift dividend
+0000044C:             ; udivision_loop
+0000044C: E0A22002    ;                ADC     R2, R2, R2                              ; Shift AccH, carry into LSB
+00000450: E1520001    ;                CMP     R2, R1                                  ; Will it go?
+00000454: 20422001    ;                SUBHS   R2, R2, R1                              ; If so, subtract
+00000458: E0B00000    ;                ADCS    R0, R0, R0                              ; Shift dividend & Acc. result
+0000045C: E2433001    ;                SUB     R3, R3, #1                              ; Loop count
+00000460: E1130003    ;                TST     R3, R3                                  ; Leaves carry alone
+00000464: 1AFFFFF8    ;                BNE     udivision_loop                          ; Repeat as required
+00000468: E8BD8008    ;                POP     {R3, PC}
+0000046C:             ; 
+0000046C:             ; 
+0000046C:             ;                INCLUDE string.s
+0000046C:             ; ;------------------------------------------------------------------------------
+0000046C:             ; ;           String and LCD functions
+0000046C:             ; ;           Ted John
+0000046C:             ; ;           Version 1.1
+0000046C:             ; ;           24th February 2013
+0000046C:             ; ;
+0000046C:             ; ; Functions for manipulating strings and interfacing with the LCD.
+0000046C:             ; ;
+0000046C:             ; ;------------------------------------------------------------------------------
+0000046C:             ; ; Requires math.s
+0000046C:             ; ;------------------------------------------------------------------------------
+0000046C:             ; 
+0000046C:             ; INT2STR_SPACES EQU     &80000000
+0000046C:             ; 
+0000046C:             ; ;------------------------------------------------------------------------------
+0000046C:             ; ; strlen() - gets the length of a string
+0000046C:             ; ;
+0000046C:             ; ; IO R0 - source string address, changed to length of string
+0000046C:             ; ;------------------------------------------------------------------------------
+0000046C:             ; strlen
+0000046C: E92D4002    ;                PUSH    {R1, LR}
+00000470: E1A01000    ;                MOV     R1, R0                                  ; save start address
+00000474: EB000001    ;                BL      strend                                  ; find end address
+00000478: E0400001    ;                SUB     R0, R0, R1                              ; return difference
+0000047C: E8BD8002    ;                POP     {R1, PC}
+00000480:             ; 
+00000480:             ; ;------------------------------------------------------------------------------
+00000480:             ; ; strend() - gets the address of the string terminator character
+00000480:             ; ;
+00000480:             ; ; IO R0 - source string / terminator address
+00000480:             ; ;------------------------------------------------------------------------------
+00000480:             ; strend
+00000480: E92D4002    ;                PUSH    {R1, LR}
+00000484:             ; strend_loop
+00000484: E4D01001    ;                LDRB    R1, [R0], #1                            ; find string terminator
+00000488: E3510000    ;                CMP     R1, #0
+0000048C: 1AFFFFFC    ;                BNE     strend_loop
+00000490: E2400001    ;                SUB     R0, R0, #1
+00000494: E8BD8002    ;                POP     {R1, PC}
+00000498:             ; 
+00000498:             ; ;------------------------------------------------------------------------------
+00000498:             ; ; appendchar() - appends an ascii character to the end of a string
+00000498:             ; ;
+00000498:             ; ; I  R0 - destination string address
+00000498:             ; ; I  R1 - ascii character to append
+00000498:             ; ;------------------------------------------------------------------------------
+00000498:             ; appendchar
+00000498: E92D4003    ;                PUSH    {R0, R1, LR}
+0000049C:             ; appendchar_loop
+0000049C: EBFFFFF7    ;                BL      strend
+000004A0: E5401000    ;                STRB    R1, [R0]                                ; overwrite the terminator with 
+                      ; the character
+000004A4: E3A01000    ;                MOV     R1, #0                                  ; write a new terminator
+000004A8: E5C01001    ;                STRB    R1, [R0, #1]
+000004AC: E8BD8003    ;                POP     {R0, R1, PC}
+000004B0:             ; 
+000004B0:             ; ;------------------------------------------------------------------------------
+000004B0:             ; ; strcat() - appends a source string to the end of a destination string
+000004B0:             ; ;
+000004B0:             ; ; I  R0 - destination string address
+000004B0:             ; ; I  R1 - source string address
+000004B0:             ; ;------------------------------------------------------------------------------
+000004B0:             ; strcat
+000004B0: E92D4001    ;                PUSH    {R0, LR}
+000004B4: EBFFFFF1    ;                BL      strend
+000004B8: EB000000    ;                BL      strcpy
+000004BC: E8BD8001    ;                POP     {R0, PC}
+000004C0:             ; 
+000004C0:             ; ;------------------------------------------------------------------------------
+000004C0:             ; ; strcpy() - copies a source string to a destination address
+000004C0:             ; ;
+000004C0:             ; ; I  R0 - destination string address
+000004C0:             ; ; I  R1 - source string address
+000004C0:             ; ;------------------------------------------------------------------------------
+000004C0:             ; strcpy
+000004C0: E92D4007    ;                PUSH    {R0, R1, R2, LR}
+000004C4:             ; strcpy_loop
+000004C4: E4D12001    ;                LDRB    R2, [R1], #1                            ; copy character
+000004C8: E4C02001    ;                STRB    R2, [R0], #1
+000004CC: E3520000    ;                CMP     R2, #0                                  ; check if string terminator
+000004D0: 1AFFFFFB    ;                BNE     strcpy_loop
+000004D4: E8BD8007    ;                POP     {R0, R1, R2, PC}
+000004D8:             ; 
+000004D8:             ; ;------------------------------------------------------------------------------
+000004D8:             ; ; int2str() - converts a 32-bit integer from a register and writes it to
+000004D8:             ; ;             a string buffer with a specified number width (0s or spaces)
+000004D8:             ; ;
+000004D8:             ; ; IO R0 - string buffer (updated to address of character directly after the last digit)
+000004D8:             ; ; I  R1 - integer
+000004D8:             ; ; I  R2 - minimum length (INT2STR_SPACES specifies whether to use spaces (set) or numbers (clea
+                      ; r))
+000004D8:             ; ;
+000004D8:             ; ;    R0 - integer as its divided or temp
+000004D8:             ; ;    R1 - divisor (always 10)
+000004D8:             ; ;    R2 - remainder (digit)
+000004D8:             ; ;    R3 - string start address (after negative sign)
+000004D8:             ; ;    R4 - string current address
+000004D8:             ; ;    R5 - string end address
+000004D8:             ; ;    R6 - minimum length (backup)
+000004D8:             ; ;------------------------------------------------------------------------------
+000004D8:             ; int2str
+000004D8: E92D407E    ;                PUSH    {R1, R2, R3, R4, R5, R6, LR}
+000004DC:             ; 
+000004DC: E1A03000    ;                MOV     R3, R0                                  ; set the string address pointer
+                      ; s
+000004E0: E1A04000    ;                MOV     R4, R0
+000004E4: E1A06002    ;                MOV     R6, R2                                  ; move minimum length to a diffe
+                      ; rent register
+000004E8:             ; 
+000004E8: E3510000    ;                CMP     R1, #0                                  ; check if input number is 0 (sp
+                      ; ecial case)
+000004EC: 1A000002    ;                BNE     int2str_negative_check
+000004F0: E3A00030    ;                MOV     R0, #'0'                                ; just append a single ascii 0
+000004F4: E4C40001    ;                STRB    R0, [R4], #1
+000004F8: EA00000D    ;                B       int2str_digit_finalise                  ; jump to the finalise code
+000004FC:             ; 
+000004FC:             ; int2str_negative_check
+000004FC: E1110001    ;                TST     R1, R1                                  ; check if input number is negat
+                      ; ive
+00000500: 5A000003    ;                BPL     int2str_digit_write
+00000504: E3A0002D    ;                MOV     R0, #'-'                                ; store ascii negative sign, inc
+                      ; rement address
+00000508: E4C40001    ;                STRB    R0, [R4], #1
+0000050C: E2611000    ;                RSB     R1, R1, #0                              ; perform 2's complement, (inver
+                      ; t bits and add 1)
+00000510: E1A03004    ;                MOV     R3, R4                                  ; set start of string address as
+                      ;  well, (negative sign is not included in reorder)
+00000514:             ; 
+00000514:             ; int2str_digit_write
+00000514: E1A00001    ;                MOV     R0, R1                                  ; set left over digits to input 
+                      ; number
+00000518: E3A0100A    ;                MOV     R1, #10          
+0000051C:             ; int2str_digit_write_loop
+0000051C: E3500000    ;                CMP     R0, #0                                  ; check if there are any left ov
+                      ; er digits
+00000520: 0A000003    ;                BEQ     int2str_digit_finalise
+00000524: EBFFFFC4    ;                BL      udivision
+00000528: E2822030    ;                ADD     R2, R2, #'0'                            ; convert remainder to ascii
+0000052C: E4C42001    ;                STRB    R2, [R4], #1                            ; store ascii digit, increment a
+                      ; ddress
+00000530: EAFFFFF9    ;                B       int2str_digit_write_loop
+00000534:             ; 
+00000534:             ; int2str_digit_finalise
+00000534: E3C65102    ;                BIC     R5, R6, #INT2STR_SPACES                 ; get minimum length of string
+00000538: E0855003    ;                ADD     R5, R5, R3                              ; add string start address
+0000053C: E1550004    ;                CMP     R5, R4                                  ; check if end address is less t
+                      ; han current address
+00000540: B1A05004    ;                MOVLT   R5, R4                                  ;   if so then set end address t
+                      ; o current address
+00000544:             ;                
+00000544:             ; int2str_digit_fill
+00000544: DA000006    ;                BLE     int2str_digit_reverse                   ; skip this step if number was l
+                      ; onger than minimum length
+00000548: E3A00030    ;                MOV     R0, #'0'
+0000054C: E3160102    ;                TST     R6, #INT2STR_SPACES                     ; if sign bit set, use spaces in
+                      ; stead of zeros
+00000550: 13A00020    ;                MOVNE   R0, #' '
+00000554: E3C66102    ;                BIC     R6, R6, #INT2STR_SPACES                 ; clear sign bit so it is just t
+                      ; he length
+00000558:             ; int2str_digit_fill_loop
+00000558: E4C40001    ;                STRB    R0, [R4], #1                            ; append the padding ascii value
+                      ;  until we have reached the minimum length
+0000055C: E1540005    ;                CMP     R4, R5
+00000560: BAFFFFFC    ;                BLT     int2str_digit_fill_loop
+00000564:             ; 
+00000564:             ; int2str_digit_reverse
+00000564: E2444001    ;                SUB     R4, R4, #1
+00000568:             ; int2str_digit_reverse_loop
+00000568: E5530000    ;                LDRB    R0, [R3]                                ; load character a and b
+0000056C: E5541000    ;                LDRB    R1, [R4]
+00000570: E4440001    ;                STRB    R0, [R4], #-1                           ; store characters in swapped lo
+                      ; cations and adjust pointers
+00000574: E4C31001    ;                STRB    R1, [R3], #1
+00000578: E1530004    ;                CMP     R3, R4                                  ; check if left pointer and righ
+                      ; t pointer have met up or crossed over
+0000057C: BAFFFFF9    ;                BLT     int2str_digit_reverse_loop
+00000580:             ; 
+00000580: E3A00000    ;                MOV      R0, #0
+00000584: E5450000    ;                STRB     R0, [R5]                               ; null terminate
+00000588: E1A00005    ;                MOV      R0, R5                                 ; set R0 to address of character
+                      ;  after number
+0000058C: E8BD807E    ;                POP      {R1, R2, R3, R4, R5, R6, PC}
+00000590:             ; 
+00000590:             ; 
+00000590:             ; 
+00000590:             ; 
+00000590:             ; 
+00000590:             ; ;------------------------------------------------------------------------------
+00008000:             ;                ORG     OFFSET_USER
+00008000:             ; 
+00008000:             ; ;------------------------------------------------------------------------------
+00008000:             ; ; 
+00008000:             ; ;------------------------------------------------------------------------------
+00008000:             ; STATE_ABOUT            EQU     0
+00008000:             ; STATE_STOPPED          EQU     1
+00008000:             ; STATE_PLAYING          EQU     2
+00008000:             ; STATE_FINISHED         EQU     3
+00008000:             ; STATE_END              EQU     4
+00008000:             ; 
+00008000:             ; ;------------------------------------------------------------------------------
+00008000:             ; ; Program variables
+00008000:             ; ;------------------------------------------------------------------------------
+00008000:             ; module_project         DEFS    MODULE_PROJECT_SIZE
+00008010:             ; module_ui              DEFS    MODULE_UI_SIZE
+00008358:             ; module_player          DEFS    MODULE_PLAYER_SIZE
+0000839C:             ;                ALIGN
+0000839C:             ; 
+0000839C:             ; ;------------------------------------------------------------------------------
+0000839C:             ; ; main() - user program entry point
+0000839C:             ; ;
+0000839C:             ; ; R7 - port i/o
+0000839C:             ; ;------------------------------------------------------------------------------ 
+0000839C:             ; main
+0000839C: E3A0DB9F    ;                MOV     SP, #OFFSET_ENDRAM                      ; initialise user stack pointer
+000083A0:             ; 
+000083A0: E3A03902    ;                MOV     R3, #OFFSET_USER
+000083A4: E2830000    ;                ADD     R0, R3, #(module_project-OFFSET_USER)
+000083A8: E2831010    ;                ADD     R1, R3, #(module_ui-OFFSET_USER)
+000083AC: E2832FD6    ;                ADD     R2, R3, #(module_player-OFFSET_USER)
+000083B0: EB000002    ;                BL      project_init                            ; initialise the project module
+000083B4: EB00000C    ;                BL      project_run                             ; run the project program
+000083B8: EF000000    ;                SVC     SVC_EXIT                                ; close the operating system
+000083BC:             ; 
+000083BC:             ; ;------------------------------------------------------------------------------
+000083BC:             ; ; MODULE_PROJECT - structure for storing the project variables
+000083BC:             ; ;------------------------------------------------------------------------------
+000083BC:             ; RECORD
+000083BC:             ; MODULE_PROJECT_UI                  WORD
+000083BC:             ; MODULE_PROJECT_PLAYER              WORD
+000083BC:             ; MODULE_PROJECT_MUSIC               WORD
+000083BC:             ; MODULE_PROJECT_STATE               WORD
+000083BC:             ; MODULE_PROJECT_SIZE                ALIAS
+000083BC:             ; 
+000083BC:             ; ;------------------------------------------------------------------------------
+000083BC:             ; ; project_init() - display information on the LCD
+000083BC:             ; ;
+000083BC:             ; ; I  R0 - project module address
+000083BC:             ; ; I  R1 - ui module address
+000083BC:             ; ; I  R2 - player module address
+000083BC:             ; ;------------------------------------------------------------------------------
+000083BC:             ; project_init_music_offset
+000083BC: 00008BC4    ;                DEFW    music_data
+000083C0:             ; project_init
+000083C0: E92D400B    ;                PUSH    {R0, R1, R3, LR}
+000083C4: E5801000    ;                STR     R1, [R0, #MODULE_PROJECT_UI]            ; store ui module address
+000083C8: E5802004    ;                STR     R2, [R0, #MODULE_PROJECT_PLAYER]        ; store player module address
+000083CC:             ; 
+000083CC: E51F3018    ;                LDR     R3, project_init_music_offset           ; store music data address
+000083D0: E5803008    ;                STR     R3, [R0, #MODULE_PROJECT_MUSIC]
+000083D4:             ; 
+000083D4: E1A01000    ;                MOV     R1, R0                                  ; project module address
+000083D8: E1A00002    ;                MOV     R0, R2                                  ; player module address
+000083DC: EB00007D    ;                BL      player_init                             ; initialise player module
+000083E0:             ; 
+000083E0: E5910000    ;                LDR     R0, [R1, #MODULE_PROJECT_UI]
+000083E4: EB00013F    ;                BL      ui_init
+000083E8:             ; 
+000083E8: E8BD800B    ;                POP     {R0, R1, R3, PC}
+000083EC:             ; 
+000083EC:             ; ;------------------------------------------------------------------------------
+000083EC:             ; ; project_run() - run the project program
+000083EC:             ; ;
+000083EC:             ; ; I  R0 - project module address
+000083EC:             ; ;
+000083EC:             ; ;    R2 - project module address
+000083EC:             ; ;------------------------------------------------------------------------------
+000083EC:             ; project_run
+000083EC: E92D4007    ;                PUSH    {R0, R1, R2, LR}
+000083F0: E1A02000    ;                MOV     R2, R0
+000083F4:             ;                                                                ; initialisation
+000083F4: E3A00000    ;                MOV     R0, #STATE_ABOUT                        ; set about state
+000083F8: E582000C    ;                STR     R0, [R2, #MODULE_PROJECT_STATE]
+000083FC: E5920000    ;                LDR     R0, [R2, #MODULE_PROJECT_UI]
+00008400: EB00014E    ;                BL      ui_show_about
+00008404:             ; 
+00008404:             ; project_run_loop
+00008404: E592100C    ;                LDR     R1, [R2, #MODULE_PROJECT_STATE]
+00008408: E3510002    ;                CMP     R1, #STATE_PLAYING
+0000840C: 1A000004    ;                BNE     project_run_post_playing_check
+00008410:             ; 
+00008410: E5920004    ;                LDR     R0, [R2, #MODULE_PROJECT_PLAYER]        ; update the player
+00008414: EB0000AE    ;                BL      player_update
+00008418: E3510000    ;                CMP     R1, #FALSE                              ; check if track has finished
+0000841C: 03A01003    ;                MOVEQ   R1, #STATE_FINISHED                     ;   set state to stopped
+00008420: 0582100C    ;                STREQ   R1, [R2, #MODULE_PROJECT_STATE]
+00008424:             ; 
+00008424:             ; project_run_post_playing_check
+00008424: E5920000    ;                LDR     R0, [R2, #MODULE_PROJECT_UI]            ; update the ui (time)
+00008428:             ; 
+00008428: E3510000    ;                CMP     R1, #STATE_ABOUT
+0000842C: 0A000000    ;                BEQ     project_run_post_about_check               
+00008430: EB000164    ;                BL      ui_track_updated
+00008434:             ; 
+00008434:             ; project_run_post_about_check
+00008434: EB0001A7    ;                BL      ui_handle_input                         ; handle input
+00008438:             ; 
+00008438: E592000C    ;                LDR     R0, [R2, #MODULE_PROJECT_STATE]
+0000843C: E3500004    ;                CMP     R0, #STATE_END
+00008440: 1AFFFFEF    ;                BNE     project_run_loop
+00008444:             ; 
+00008444: E8BD8007    ;                POP     {R0, R1, R2, PC}
+00008448:             ; 
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; ; Include other modules
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ;                INCLUDE ./player.s
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; ;           Project
+00008448:             ; ;           Ted John
+00008448:             ; ;           Version 1.0
+00008448:             ; ;           16 April 2013
+00008448:             ; ;
+00008448:             ; ; Code for loading, reading and playing music.
+00008448:             ; ;
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; ; Includes os.s
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; 
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; ; player_time_periods (in microseconds)
+00008448:             ; ;------------------------------------------------------------------------------
+00008448:             ; player_time_periods
+00008448:             ;        ;      C,    C#,     D,    D#,     E,     F,    F#,     G,    G#,     A,    A#,     B
+00008448: 0000EEEA    ;     DEFW  61162, 57737, 54496, 51414, 48544, 45809, 43253, 40816, 38521, 36364, 34317, 32394  ;
+0000844C: 0000E189    ;  octave 0
+00008450: 0000D4E0    ; 
+00008454: 0000C8D6    ; 
+00008458: 0000BDA0    ; 
+0000845C: 0000B2F1    ; 
+00008460: 0000A8F5    ; 
+00008464: 00009F70    ; 
+00008468: 00009679    ; 
+0000846C: 00008E0C    ; 
+00008470: 0000860D    ; 
+00008474: 00007E8A    ; 
+00008478: 00007775    ;     DEFW  30581, 28860, 27241, 25714, 24272, 22910, 21622, 20408, 19264, 18182, 17161, 16197  ;
+0000847C: 000070BC    ;  octave 1
+00008480: 00006A69    ; 
+00008484: 00006472    ; 
+00008488: 00005ED0    ; 
+0000848C: 0000597E    ; 
+00008490: 00005476    ; 
+00008494: 00004FB8    ; 
+00008498: 00004B40    ; 
+0000849C: 00004706    ; 
+000084A0: 00004309    ; 
+000084A4: 00003F45    ; 
+000084A8: 00003BB8    ;     DEFW  15288, 14430, 13620, 12857, 12134, 11453, 10811, 10204,  9631,  9091,  8581,  8099  ;
+000084AC: 0000385E    ;  octave 2
+000084B0: 00003534    ; 
+000084B4: 00003239    ; 
+000084B8: 00002F66    ; 
+000084BC: 00002CBD    ; 
+000084C0: 00002A3B    ; 
+000084C4: 000027DC    ; 
+000084C8: 0000259F    ; 
+000084CC: 00002383    ; 
+000084D0: 00002185    ; 
+000084D4: 00001FA3    ; 
+000084D8: 00001DDD    ;     DEFW   7645,  7216,  6811,  6428,  6068,  5727,  5405,  5102,  4816,  4545,  4290,  4050  ;
+000084DC: 00001C30    ;  octave 3
+000084E0: 00001A9B    ; 
+000084E4: 0000191C    ; 
+000084E8: 000017B4    ; 
+000084EC: 0000165F    ; 
+000084F0: 0000151D    ; 
+000084F4: 000013EE    ; 
+000084F8: 000012D0    ; 
+000084FC: 000011C1    ; 
+00008500: 000010C2    ; 
+00008504: 00000FD2    ; 
+00008508: 00000EEE    ;     DEFW   3822,  3608,  3405,  3214,  3034,  2863,  2703,  2551,  2408,  2273,  2145,  2025  ;
+0000850C: 00000E18    ;  octave 4
+00008510: 00000D4D    ; 
+00008514: 00000C8E    ; 
+00008518: 00000BDA    ; 
+0000851C: 00000B2F    ; 
+00008520: 00000A8F    ; 
+00008524: 000009F7    ; 
+00008528: 00000968    ; 
+0000852C: 000008E1    ; 
+00008530: 00000861    ; 
+00008534: 000007E9    ; 
+00008538: 00000777    ;     DEFW   1911,  1804,  1703,  1607,  1517,  1432,  1351,  1276,  1204,  1136,  1073,  1012  ;
+0000853C: 0000070C    ;  octave 5
+00008540: 000006A7    ; 
+00008544: 00000647    ; 
+00008548: 000005ED    ; 
+0000854C: 00000598    ; 
+00008550: 00000547    ; 
+00008554: 000004FC    ; 
+00008558: 000004B4    ; 
+0000855C: 00000470    ; 
+00008560: 00000431    ; 
+00008564: 000003F4    ; 
+00008568: 000003BC    ;     DEFW    956,   902,   851,   804,   758,   716,   676,   638,   602,   568,   536,   506  ;
+0000856C: 00000386    ;  octave 6
+00008570: 00000353    ; 
+00008574: 00000324    ; 
+00008578: 000002F6    ; 
+0000857C: 000002CC    ; 
+00008580: 000002A4    ; 
+00008584: 0000027E    ; 
+00008588: 0000025A    ; 
+0000858C: 00000238    ; 
+00008590: 00000218    ; 
+00008594: 000001FA    ; 
+00008598: 000001DE    ;     DEFW    478,   451,   426,   402,   379,   358,   338,   319,   301,   284,   268,   253  ;
+0000859C: 000001C3    ;  octave 7
+000085A0: 000001AA    ; 
+000085A4: 00000192    ; 
+000085A8: 0000017B    ; 
+000085AC: 00000166    ; 
+000085B0: 00000152    ; 
+000085B4: 0000013F    ; 
+000085B8: 0000012D    ; 
+000085BC: 0000011C    ; 
+000085C0: 0000010C    ; 
+000085C4: 000000FD    ; 
+000085C8: 000000EF    ;     DEFW    239,   225,   213,   201                                                          ;
+000085CC: 000000E1    ;  octave 8
+000085D0: 000000D5    ; 
+000085D4: 000000C9    ; 
+000085D8:             ; 
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; PLAYER_MAX_CHANNELS    EQU     2
+000085D8:             ; 
+000085D8:             ; BEATS_PER_BAR          EQU     4
+000085D8:             ; 
+000085D8:             ; NOTE_BARFRAC_SHIFT     EQU     24
+000085D8:             ; NOTE_BAR_SHIFT         EQU     16
+000085D8:             ; NOTE_OCTAVE_SHIFT      EQU     8
+000085D8:             ; NOTE_KEY_SHIFT         EQU     0
+000085D8:             ; 
+000085D8:             ; SEQUENCE_INDEX_END     EQU     -1
+000085D8:             ; SEQUENCE_END           EQU     0
+000085D8:             ; 
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; ; MODULE_PLAYER structure
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; RECORD
+000085D8:             ; MODULE_PLAYER_PROJECT              WORD
+000085D8:             ; MODULE_PLAYER_TRACK_INDEX          WORD
+000085D8:             ; MODULE_PLAYER_TRACK_NAME           WORD
+000085D8:             ; MODULE_PLAYER_TEMPO                WORD
+000085D8:             ; MODULE_PLAYER_NUM_CHANNELS         WORD
+000085D8:             ; MODULE_PLAYER_LAST_TICK            WORD
+000085D8:             ; MODULE_PLAYER_ELAPSED_TICKS        WORD
+000085D8:             ; MODULE_PLAYER_CHANNELS             BYTE      (CHANNEL_STATE_SIZE * PLAYER_MAX_CHANNELS)
+000085D8:             ; MODULE_PLAYER_SIZE                 ALIAS
+000085D8:             ; 
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; ; CHANNEL_STATE structure
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; RECORD
+000085D8:             ; CHANNEL_STATE_INDEX                WORD
+000085D8:             ; CHANNEL_STATE_FINISHED             WORD
+000085D8:             ; CHANNEL_STATE_WAITTIME             WORD
+000085D8:             ; CHANNEL_STATE_SEQINDEX_ADDRESS     WORD
+000085D8:             ; CHANNEL_STATE_SEQUENCE_ADDRESS     WORD
+000085D8:             ; CHANNEL_STATE_SIZE                 ALIAS
+000085D8:             ; 
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; ; player_init() - initialises the player module
+000085D8:             ; ;
+000085D8:             ; ; I  R0 - player module address
+000085D8:             ; ; I  R1 - project module address
+000085D8:             ; ;------------------------------------------------------------------------------
+000085D8:             ; player_init
+000085D8: E92D400C    ;                PUSH    {R2, R3, LR}
+000085DC: E5801000    ;                STR     R1, [R0, #MODULE_PLAYER_PROJECT]
+000085E0:             ; 
+000085E0: E3A03000    ;                MOV     R3, #0                                  ; set each channel state index
+000085E4: E280201C    ;                ADD     R2, R0, #MODULE_PLAYER_CHANNELS
+000085E8:             ; 
+000085E8:             ; player_init_loop
+000085E8: E5823000    ;                STR     R3, [R2, #CHANNEL_STATE_INDEX]
+000085EC: E2822014    ;                ADD     R2, R2, #CHANNEL_STATE_SIZE
+000085F0: E2833001    ;                ADD     R3, R3, #1
+000085F4: E3530002    ;                CMP     R3, #PLAYER_MAX_CHANNELS
+000085F8: BAFFFFFA    ;                BLT     player_init_loop
+000085FC:             ; 
+000085FC: E8BD800C    ;                POP     {R2, R3, PC}
+00008600:             ; 
+00008600:             ; ;------------------------------------------------------------------------------
+00008600:             ; ; player_load_track() - loads a particular track
+00008600:             ; ;
+00008600:             ; ; I  R0 - player module address
+00008600:             ; ; I  R1 - track index
+00008600:             ; ;------------------------------------------------------------------------------
+00008600:             ; player_load_track
+00008600: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+00008604: E5801004    ;                STR     R1, [R0, #MODULE_PLAYER_TRACK_INDEX]    ; set track index
+00008608:             ; 
+00008608: E5902000    ;                LDR     R2, [R0, #MODULE_PLAYER_PROJECT]        ; get music data address
+0000860C: E5922008    ;                LDR     R2, [R2, #MODULE_PROJECT_MUSIC]
+00008610: E2823008    ;                ADD     R3, R2, #(tl_tracks-music_data)         ; get track data address
+00008614: E7931101    ;                LDR     R1, [R3, R1 LSL #2]
+00008618:             ; 
+00008618: EB000004    ;                BL      player_read_track_info                  ; read the track info
+0000861C: EB000010    ;                BL      player_read_track_channels              ; read the track channels
+00008620:             ; 
+00008620: E3A03000    ;                MOV     R3, #0                                  ; initialise timing
+00008624: E5803014    ;                STR     R3, [R0, #MODULE_PLAYER_LAST_TICK]
+00008628: E5803018    ;                STR     R3, [R0, #MODULE_PLAYER_ELAPSED_TICKS]
+0000862C:             ; 
+0000862C: E8BD800E    ;                POP     {R1, R2, R3, PC}
+00008630:             ; 
+00008630:             ; ;------------------------------------------------------------------------------
+00008630:             ; ; player_read_track_info() - read the track information from the given stream
+00008630:             ; ;
+00008630:             ; ; I  R0 - player module address
+00008630:             ; ; IO R1 - stream
+00008630:             ; ;------------------------------------------------------------------------------
+00008630:             ; player_read_track_info
+00008630: E92D4004    ;                PUSH    {R2, LR}
+00008634: E5801008    ;                STR     R1, [R0, #MODULE_PLAYER_TRACK_NAME]     ; load track name
+00008638: E1A02000    ;                MOV     R2, R0                                  ; preserve R0
+0000863C: E1A00001    ;                MOV     R0, R1
+00008640: EBFFDF8E    ;                BL      strend                                  ; get null terminator address
+00008644: E2800004    ;                ADD     R0, R0, #4                              ; skip null terminator and align
+                      ; ment
+00008648: E3C01003    ;                BIC     R1, R0, #3
+0000864C: E1A00002    ;                MOV     R0, R2                                  ; restore R0
+00008650:             ; 
+00008650: E4912004    ;                LDR     R2, [R1], #4                            ; load tempo
+00008654: E580200C    ;                STR     R2, [R0, #MODULE_PLAYER_TEMPO]
+00008658: E4912004    ;                LDR     R2, [R1], #4                            ; load number of channels
+0000865C: E5802010    ;                STR     R2, [R0, #MODULE_PLAYER_NUM_CHANNELS]
+00008660: E8BD8004    ;                POP     {R2, PC}
+00008664:             ; 
+00008664:             ; ;------------------------------------------------------------------------------
+00008664:             ; ; player_read_track_channels() - initialises all the channel states
+00008664:             ; ;
+00008664:             ; ; I  R0 - player module address
+00008664:             ; ; IO R1 - stream (doesn't read > 2 channels, stream would be in wrong place)
+00008664:             ; ;
+00008664:             ; ;    R2 - address of channel state
+00008664:             ; ;    R3 - number of channels
+00008664:             ; ;    R4 - channel iterator index
+00008664:             ; ;------------------------------------------------------------------------------
+00008664:             ; player_read_track_channels
+00008664: E92D401C    ;                PUSH    {R2, R3, R4, LR}
+00008668: E280201C    ;                ADD     R2, R0, #MODULE_PLAYER_CHANNELS         ; get address of first channel s
+                      ; tate
+0000866C: E5903010    ;                LDR     R3, [R0, #MODULE_PLAYER_NUM_CHANNELS]   ; get num channels
+00008670: E3A04000    ;                MOV     R4, #0                                  ; set channel iterator index
+00008674:             ; 
+00008674:             ; player_read_track_channels_loop
+00008674: E1540003    ;                CMP     R4, R3                                  ; loop condition
+00008678: AA000005    ;                BGE     player_read_track_channels_end
+0000867C: E3540002    ;                CMP     R4, #PLAYER_MAX_CHANNELS                ; skip rest of the channels
+00008680: AA000003    ;                BGE     player_read_track_channels_end
+00008684: EB000003    ;                BL      player_read_track_channel               ; read the channel
+00008688:             ; 
+00008688:             ; player_read_track_channels_next
+00008688: E2842014    ;                ADD     R2, R4, #CHANNEL_STATE_SIZE             ; next channel
+0000868C: E2834001    ;                ADD     R4, R3, #1
+00008690: EAFFFFF7    ;                B       player_read_track_channels_loop
+00008694:             ; 
+00008694:             ; player_read_track_channels_end
+00008694: E8BD801C    ;                POP     {R2, R3, R4, PC}
+00008698:             ; 
+00008698:             ; ;------------------------------------------------------------------------------
+00008698:             ; ; player_read_track_channel() - initialises a single channel state
+00008698:             ; ;
+00008698:             ; ; I  R0 - player module address
+00008698:             ; ; IO R1 - stream
+00008698:             ; ; I  R2 - channel state address
+00008698:             ; ; I  R4 - first sequence index
+00008698:             ; ;------------------------------------------------------------------------------
+00008698:             ; player_read_track_channel
+00008698: E92D401A    ;                PUSH    {R1, R3, R4, LR}
+0000869C: E3A03000    ;                MOV     R3, #FALSE                              ; initialise channel
+000086A0: E5823004    ;                STR     R3, [R2, #CHANNEL_STATE_FINISHED]
+000086A4: E3A03000    ;                MOV     R3, #0
+000086A8: E5823008    ;                STR     R3, [R2, #CHANNEL_STATE_WAITTIME]
+000086AC: E5823010    ;                STR     R3, [R2, #CHANNEL_STATE_SEQUENCE_ADDRESS]
+000086B0:             ;                                                                ; set the sequence index address
+000086B0: E582100C    ;                STR     R1, [R2, #CHANNEL_STATE_SEQINDEX_ADDRESS]
+000086B4: E5114000    ;                LDR     R4, [R1]
+000086B8:             ; 
+000086B8:             ; player_read_track_channel_loop                                 ; skip the rest of the indicies
+000086B8: E4913004    ;                LDR     R3, [R1], #4
+000086BC: E3730001    ;                CMP     R3, #SEQUENCE_INDEX_END
+000086C0: 1AFFFFFC    ;                BNE     player_read_track_channel_loop
+000086C4:             ; 
+000086C4: E1A01002    ;                MOV     R1, R2                                  ; channel state address
+000086C8: E1A02004    ;                MOV     R2, R4                                  ; sequence index
+000086CC: EB000051    ;                BL      player_channel_load_sequence
+000086D0:             ; 
+000086D0: E8BD801A    ;                POP     {R1, R3, R4, PC}
+000086D4:             ; 
+000086D4:             ; ;------------------------------------------------------------------------------
+000086D4:             ; ; player_update() - plays any outstanding notes
+000086D4:             ; ;
+000086D4:             ; ; I  R0 - player module address
+000086D4:             ; ; O  R1 - true if the track has not finished, otherwise false
+000086D4:             ; ;------------------------------------------------------------------------------
+000086D4:             ; player_update
+000086D4: E92D4000    ;                PUSH    {LR}
+000086D8: EB000003    ;                BL      player_tick                             ; check if there has been a tick
+000086DC: E3510000    ;                CMP     R1, #FALSE
+000086E0: 03A01001    ;                MOVEQ   R1, #TRUE
+000086E4: 1B00000E    ;                BLNE    player_update_channels                  ; update channels if so
+000086E8: E8BD8000    ;                POP     {PC}
+000086EC:             ; 
+000086EC:             ; ;------------------------------------------------------------------------------
+000086EC:             ; ; player_tick() - checks if there has been a tick since last call
+000086EC:             ; ;
+000086EC:             ; ; I  R0 - player module address
+000086EC:             ; ; O  R1 - true if there has been a tick, otherwise false
+000086EC:             ; ;------------------------------------------------------------------------------
+000086EC:             ; player_tick
+000086EC: E92D4004    ;                PUSH    {R2, LR}
+000086F0: E3A02020    ;                MOV     R2, #os_tick_count                      ; calculate elapsed milliseconds
+000086F4: E5122000    ;                LDR     R2, [R2]
+000086F8: E5901014    ;                LDR     R1, [R0, #MODULE_PLAYER_LAST_TICK]
+000086FC: E0423001    ;                SUB     R3, R2, R1
+00008700: E3530000    ;                CMP     R3, #0                                  ; check if at least 1ms has elap
+                      ; sed, otherwise return false
+00008704: 03A01000    ;                MOVEQ   R1, #FALSE
+00008708: 0A000004    ;                BEQ     player_tick_return
+0000870C:             ; 
+0000870C: E5802014    ;                STR     R2, [R0, #MODULE_PLAYER_LAST_TICK]      ; update player last tick
+00008710: E5902018    ;                LDR     R2, [R0, #MODULE_PLAYER_ELAPSED_TICKS]  ; update player elapsed millisec
+                      ; onds
+00008714: E2822001    ;                ADD     R2, R2, #1
+00008718: E5802018    ;                STR     R2, [R0, #MODULE_PLAYER_ELAPSED_TICKS]
+0000871C: 03A01001    ;                MOVEQ   R1, #TRUE
+00008720:             ; 
+00008720:             ; player_tick_return
+00008720: E8BD8004    ;                POP     {R2, PC}
+00008724:             ; 
+00008724:             ; ;------------------------------------------------------------------------------
+00008724:             ; ; player_update_channels() - updates all the channels
+00008724:             ; ;
+00008724:             ; ; I  R0 - player module address
+00008724:             ; ; O  R1 - true if not all channels are finished, otherwise false
+00008724:             ; ;
+00008724:             ; ;    R1 - channel state address
+00008724:             ; ;    R2 - channel state index
+00008724:             ; ;    R3 - num channels
+00008724:             ; ;    R4 - not all channels finished flag
+00008724:             ; ;------------------------------------------------------------------------------
+00008724:             ; player_update_channels
+00008724: E92D403C    ;                PUSH    {R2, R3, R4, R5, LR}
+00008728: E3A04000    ;                MOV     R4, #FALSE                              ; set not all channels finished 
+                      ; flag
+0000872C: E280101C    ;                ADD     R1, R0, #MODULE_PLAYER_CHANNELS         ; initialise channel state loop
+00008730: E3A02000    ;                MOV     R2, #0
+00008734: E5903010    ;                LDR     R3, [R0, #MODULE_PLAYER_NUM_CHANNELS]
+00008738:             ; 
+00008738:             ; player_update_channels_loop
+00008738: E1520003    ;                CMP     R2, R3                                  ; loop condition
+0000873C: AA000007    ;                BGE     player_update_channels_end
+00008740: EB000008    ;                BL      player_update_channel                   ; update channel
+00008744: E5915004    ;                LDR     R5, [R1, #CHANNEL_STATE_FINISHED]       ; check if channel has not finis
+                      ; hed
+00008748: E3550000    ;                CMP     R5, #FALSE
+0000874C: 1A000000    ;                BNE     player_update_channels_next
+00008750: E3A04001    ;                MOV     R4, #TRUE
+00008754:             ; 
+00008754:             ; player_update_channels_next
+00008754: E2821014    ;                ADD     R1, R2, #CHANNEL_STATE_SIZE             ; next iteration
+00008758: E2822001    ;                ADD     R2, R2, #1
+0000875C: EAFFFFF5    ;                B       player_update_channels_loop
+00008760:             ; player_update_channels_end
+00008760: E1A01004    ;                MOV     R1, R4                                  ; return all channels finished f
+                      ; lag
+00008764: E8BD803C    ;                POP     {R2, R3, R4, R5, PC}
+00008768:             ; 
+00008768:             ; ;------------------------------------------------------------------------------
+00008768:             ; ; player_update_channel() - updates a channel
+00008768:             ; ;
+00008768:             ; ; I  R0 - player module address
+00008768:             ; ; I  R1 - channel state address
+00008768:             ; ;------------------------------------------------------------------------------
+00008768:             ; player_update_channel
+00008768: E92D400C    ;                PUSH    {R2, R3, LR}
+0000876C: E5912004    ;                LDR     R2, [R1, #CHANNEL_STATE_FINISHED]       ; check if channel has finished
+00008770: E3520000    ;                CMP     R2, #FALSE
+00008774: 1A000004    ;                BNE     player_update_channel_return
+00008778:             ; 
+00008778: E5912008    ;                LDR     R2, [R1, #CHANNEL_STATE_WAITTIME]       ; decrease wait time by elapsed 
+                      ; ticks
+0000877C: E2422001    ;                SUB     R2, R2, #1
+00008780: E5812008    ;                STR     R2, [R1, #CHANNEL_STATE_WAITTIME]
+00008784: E3520000    ;                CMP     R2, #0              
+00008788: DB000000    ;                BLLE    player_channel_next_note                ; play the next note on the chan
+                      ; nel    
+0000878C:             ;            
+0000878C:             ; player_update_channel_return
+0000878C: E8BD800C    ;                POP     {R2, R3, PC}
+00008790:             ; 
+00008790:             ; ;------------------------------------------------------------------------------
+00008790:             ; ; player_channel_next_note() - moves the channel onto the next note and starts
+00008790:             ; ;                              playing it
+00008790:             ; ;
+00008790:             ; ; I  R0 - player module address
+00008790:             ; ; I  R1 - channel state address
+00008790:             ; ;------------------------------------------------------------------------------
+00008790:             ; player_channel_next_note
+00008790: E92D400F    ;                PUSH    {R0, R1, R2, R3, LR}
+00008794:             ;                
+00008794: E5912010    ;                LDR     R2, [R1, #CHANNEL_STATE_SEQUENCE_ADDRESS]
+00008798: E5123000    ;                LDR     R3, [R2]                                ; get the note
+0000879C: E3530000    ;                CMP     R3, #SEQUENCE_END                       ; check if this is a sequence en
+                      ; d marker
+000087A0: 028FE028    ;                ADREQ   LR, player_channel_next_note_return     ; call next sequence and return 
+                      ; if end of sequence
+000087A4: 0A00000A    ;                BEQ     player_channel_next_sequence
+000087A8:             ; 
+000087A8: E2822004    ;                ADD     R2, R2, #4
+000087AC: E5812010    ;                STR     R2, [R1, #CHANNEL_STATE_SEQUENCE_ADDRESS]
+000087B0: E1A02000    ;                MOV     R2, R0                                  ; move player module address to 
+                      ; R2
+000087B4: E1A00003    ;                MOV     R0, R3                                  ; play the note
+000087B8: E1A03001    ;                MOV     R3, R1                                  ; move channel state address to 
+                      ; R3
+000087BC: E5931000    ;                LDR     R1, [R3, #CHANNEL_STATE_INDEX]
+000087C0: EB00002A    ;                BL      player_play_note
+000087C4:             ; 
+000087C4: E592100C    ;                LDR     R1, [R2, #MODULE_PLAYER_TEMPO]
+000087C8: EB000038    ;                BL      player_get_note_time
+000087CC: E5830008    ;                STR     R0, [R3, #CHANNEL_STATE_WAITTIME]
+000087D0:             ; 
+000087D0:             ; player_channel_next_note_return
+000087D0: E8BD800F    ;                POP     {R0, R1, R2, R3, PC}
+000087D4:             ; 
+000087D4:             ; ;------------------------------------------------------------------------------
+000087D4:             ; ; player_channel_next_sequence() - moves the channel onto the next seqeuence
+000087D4:             ; ;                                  and plays the first note
+000087D4:             ; ;
+000087D4:             ; ; I  R0 - player module address
+000087D4:             ; ; I  R1 - channel state address
+000087D4:             ; ;------------------------------------------------------------------------------
+000087D4:             ; player_channel_next_sequence
+000087D4: E92D4004    ;                PUSH    {R2, LR}
+000087D8:             ;                                                                ; get sequence index address
+000087D8: E591200C    ;                LDR     R2, [R1, #CHANNEL_STATE_SEQINDEX_ADDRESS]
+000087DC: E2822004    ;                ADD     R2, R2, #4                              ; move to next index
+000087E0: E581200C    ;                STR     R2, [R1, #CHANNEL_STATE_SEQINDEX_ADDRESS]
+000087E4: E5122000    ;                LDR     R2, [R2]                                ; load actual index
+000087E8: E3720001    ;                CMP     R2, #SEQUENCE_INDEX_END                 ; check if the end of sequence
+000087EC: 0A000002    ;                BEQ     player_channel_next_sequence_fi
+000087F0:             ; 
+000087F0: EB000008    ;                BL      player_channel_load_sequence
+000087F4: EBFFFFE5    ;                BL      player_channel_next_note
+000087F8: EA000005    ;                B       player_channel_next_sequence_re
+000087FC:             ; 
+000087FC:             ; player_channel_next_sequence_fi
+000087FC: E3A02001    ;                MOV     R2, #TRUE                               ; set finished state
+00008800: E5812004    ;                STR     R2, [R1, #CHANNEL_STATE_FINISHED]
+00008804: E1A02000    ;                MOV     R2, R0                                  ; preserve R0
+00008808: E5910000    ;                LDR     R0, [R1, #CHANNEL_STATE_INDEX]          ; stop this channel
+0000880C: EB000011    ;                BL      player_stop_note
+00008810: E3A02000    ;                MOV     R2, #0                                  ; restore R0
+00008814:             ; 
+00008814:             ; player_channel_next_sequence_re
+00008814: E8BD8004    ;                POP     {R2, PC}
+00008818:             ; 
+00008818:             ; ;------------------------------------------------------------------------------
+00008818:             ; ; player_channel_load_sequence() - loads the first note of the 
+00008818:             ; ;                                  and plays the first note
+00008818:             ; ;
+00008818:             ; ; I  R0 - player module address
+00008818:             ; ; I  R1 - channel state address
+00008818:             ; ; I  R2 - sequence index
+00008818:             ; ;------------------------------------------------------------------------------
+00008818:             ; player_channel_load_sequence
+00008818: E92D4008    ;                PUSH    {R3, LR}
+0000881C: E5903000    ;                LDR     R3, [R0, #MODULE_PLAYER_PROJECT]        ; get music data address
+00008820: E5933008    ;                LDR     R3, [R3, #MODULE_PROJECT_MUSIC]
+00008824: E283301C    ;                ADD     R3, R3, #(tl_seq-music_data)            ; get sequence data address
+00008828: E7933102    ;                LDR     R3, [R3, R2 LSL #2]
+0000882C:             ;                                                                ; set channel state sequence
+0000882C: E5813010    ;                STR     R3, [R1, #CHANNEL_STATE_SEQUENCE_ADDRESS]
+00008830: E8BD8008    ;                POP     {R3, PC}
+00008834:             ; 
+00008834:             ; ;------------------------------------------------------------------------------
+00008834:             ; ; player_stop_all_channels() - stops each channel note
+00008834:             ; ;
+00008834:             ; ;    R0 - channel index
+00008834:             ; ;    R1 - number of channels
+00008834:             ; ;------------------------------------------------------------------------------
+00008834:             ; player_stop_all_channels
+00008834: E92D4003    ;                PUSH    {R0, R1, LR}
+00008838: E3A01002    ;                MOV     R1, #PLAYER_MAX_CHANNELS
+0000883C: E3A00000    ;                MOV     R0, #0
+00008840:             ; player_stop_all_channels_loop
+00008840: E1500001    ;                CMP     R0, R1
+00008844: AA000002    ;                BGE     player_stop_all_channels_return
+00008848: EB000002    ;                BL      player_stop_note
+0000884C: E2800001    ;                ADD     R0, R0, #1
+00008850: EAFFFFFA    ;                B       player_stop_all_channels_loop
+00008854:             ; player_stop_all_channels_return
+00008854: E8BD8003    ;                POP     {R0, R1, PC}
+00008858:             ; 
+00008858:             ; ;------------------------------------------------------------------------------
+00008858:             ; ; player_stop_note() - stops whatever note is playing on a channel
+00008858:             ; ;
+00008858:             ; ; I  R0 - channel index
+00008858:             ; ;------------------------------------------------------------------------------
+00008858:             ; player_stop_note
+00008858: E92D4003    ;                PUSH    {R0, R1, LR}
+0000885C: E1A01000    ;                MOV     R1, R0
+00008860: E3A00000    ;                MOV     R0, #0
+00008864: EF000007    ;                SVC     SVC_BUZZ_SET
+00008868: E8BD8003    ;                POP     {R0, R1, PC}
+0000886C:             ; 
+0000886C:             ; ;------------------------------------------------------------------------------
+0000886C:             ; ; player_play_note() - plays a certain note on a channel
+0000886C:             ; ;
+0000886C:             ; ; I  R0 - note
+0000886C:             ; ; I  R1 - channel index
+0000886C:             ; ;------------------------------------------------------------------------------
+0000886C:             ; player_play_note_periods_offset
+0000886C: 00008448    ;                DEFW    player_time_periods
+00008870:             ; player_play_note
+00008870: E92D400D    ;                PUSH    {R0, R2, R3, LR}
+00008874:             ; 
+00008874: E1A02000    ;                MOV     R2, R0 LSR #NOTE_KEY_SHIFT              ; get key and octave from word
+00008878: E20220FF    ;                AND     R2, R2, #&FF
+0000887C: E1A03420    ;                MOV     R3, R0 LSR #NOTE_OCTAVE_SHIFT
+00008880: E20330FF    ;                AND     R3, R3, #&FF
+00008884:             ; 
+00008884: E3520000    ;                CMP     R2, #0                                  ; check if note is a rest
+00008888: 0BFFFFF2    ;                BLEQ    player_stop_note
+0000888C: 0A000006    ;                BEQ     player_play_note_return
+00008890:             ; 
+00008890: E3A0000C    ;                MOV     R0, #12                                 ; combine key and octave for loo
+                      ; kup table
+00008894: E0030093    ;                MUL     R3, R3, R0
+00008898: E0822003    ;                ADD     R2, R2, R3
+0000889C:             ; 
+0000889C: E51F3038    ;                LDR     R3, player_play_note_periods_offset     ; get note time period from look
+                      ; up table
+000088A0: E7930102    ;                LDR     R0, [R3, R2 LSL #2]
+000088A4: E3800902    ;                ORR     R0, R0, #BUZZER_ENABLE_MASK             ; set enable
+000088A8: EF000007    ;                SVC     SVC_BUZZ_SET
+000088AC:             ; 
+000088AC:             ; player_play_note_return
+000088AC: E8BD800D    ;                POP     {R0, R2, R3, PC}
+000088B0:             ; 
+000088B0:             ; ;------------------------------------------------------------------------------
+000088B0:             ; ; player_get_note_time() - gets the number of ticks to play a specific note for
+000088B0:             ; ;
+000088B0:             ; ; IO R0 - note / time
+000088B0:             ; ; I  R1 - tempo
+000088B0:             ; ;------------------------------------------------------------------------------
+000088B0:             ; player_get_note_time
+000088B0: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+000088B4: E1A02420    ;                MOV     R2, R0 LSR #(NOTE_BAR_SHIFT - 8)        ; get bar length
+000088B8: E2022CFF    ;                AND     R2, R2, #&FF00
+000088BC: E1A03C20    ;                MOV     R3, R0 LSR #NOTE_BARFRAC_SHIFT
+000088C0: E20330FF    ;                AND     R3, R3, #&FF
+000088C4: E1822003    ;                ORR     R2, R2, R3
+000088C8: E1A02102    ;                MOV     R2, R2 LSL #2                           ; multiply by BEATS_PER_BAR
+000088CC: E3A0003C    ;                MOV     R0, #60                                 ; convert to milliseconds
+000088D0: E0020092    ;                MUL     R2, R2, R0
+000088D4: E3A00FFA    ;                MOV     R0, #1000
+000088D8: E0020092    ;                MUL     R2, R2, R0
+000088DC: E1A00422    ;                MOV     R0, R2 LSR #8                           ; divide by 256 (bar value)
+000088E0: EBFFDED5    ;                BL      udivision                               ; divide by tempo
+000088E4: E8BD800E    ;                POP     {R1, R2, R3, PC}
+000088E8:             ; 
+000088E8:             ; 
+000088E8:             ;                INCLUDE ./ui.s
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; ;           UI module
+000088E8:             ; ;           Ted John
+000088E8:             ; ;           Version 1.0
+000088E8:             ; ;           23 April 2013
+000088E8:             ; ;
+000088E8:             ; ; Functions for interfacing with the LCD.
+000088E8:             ; ;
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; ; Requires 
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; 
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; ; MODULE_UI - structure for storing the UI variables
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; RECORD
+000088E8:             ; MODULE_UI_PROJECT                  WORD
+000088E8:             ; MODULE_UI_SCROLL_SAVETICK          WORD
+000088E8:             ; MODULE_UI_TIME_SAVETICK            WORD
+000088E8:             ; MODULE_UI_LCD_SCROLLERS            BYTE      (LCD_SCROLLER_SIZE * 2)
+000088E8:             ; MODULE_UI_BUFFER                   BYTE      256
+000088E8:             ; MODULE_UI_LAST_KEYPAD_SCAN         WORD
+000088E8:             ; MODULE_UI_SIZE                     ALIAS
+000088E8:             ; 
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; ; ui_init() - initialises the ui module
+000088E8:             ; ;
+000088E8:             ; ; I  R0 - ui module address
+000088E8:             ; ; I  R1 - project module address
+000088E8:             ; ;------------------------------------------------------------------------------
+000088E8:             ; ui_init
+000088E8: E92D400F    ;                PUSH    {R0, R1, R2, R3, LR}
+000088EC: E5801000    ;                STR     R1, [R0, #MODULE_UI_PROJECT]
+000088F0:             ; 
+000088F0: E3A02000    ;                MOV     R2, #0
+000088F4: E5802004    ;                STR     R2, [R0, #MODULE_UI_SCROLL_SAVETICK]
+000088F8: E5802008    ;                STR     R2, [R0, #MODULE_UI_TIME_SAVETICK]
+000088FC:             ; 
+000088FC: EF000002    ;                SVC     SVC_LCD_CLEAR
+00008900: EF000001    ;                SVC     SVC_LCD_LIGHT
+00008904:             ; 
+00008904: E280000C    ;                ADD     R0, R0, #MODULE_UI_LCD_SCROLLERS
+00008908: E3A01000    ;                MOV     R1, #0
+0000890C: EBFFDE1F    ;                BL      lcd_scroller_init
+00008910: E2800F47    ;                ADD     R0, R0, #LCD_SCROLLER_SIZE
+00008914: E3A01001    ;                MOV     R1, #1
+00008918: EBFFDE1C    ;                BL      lcd_scroller_init
+0000891C: E8BD800F    ;                POP     {R0, R1, R2, R3, PC}
+00008920:             ; 
+00008920:             ; ;------------------------------------------------------------------------------
+00008920:             ; ; ui_show_about() - shows the about screen / credits
+00008920:             ; ;
+00008920:             ; ; I  R0 - ui module address
+00008920:             ; ;------------------------------------------------------------------------------
+00008920:             ; ui_show_about_sz_top
+00008920: 4D 75 73 69 ;                DEFB    "Music Player",0
+00008924: 63 20 50 6C ; 
+00008928: 61 79 65 72 ; 
+0000892C: 00          ; 
+00008930:             ;                ALIGN
+00008930:             ; ui_show_about_sz_bottom
+00008930: 54 65 64 20 ;                DEFB    "Ted John, 2013",0
+00008934: 4A 6F 68 6E ; 
+00008938: 2C 20 32 30 ; 
+0000893C: 31 33 00    ; 
+00008940:             ;                ALIGN
+00008940:             ; ui_show_about
+00008940: E92D4003    ;                PUSH    {R0, R1, LR}
+00008944: E280000C    ;                ADD     R0, R0, #MODULE_UI_LCD_SCROLLERS        ; get top scroller
+00008948: E24F1030    ;                ADR     R1, ui_show_about_sz_top                ; set the top scroller text
+0000894C: EBFFDE16    ;                BL      lcd_scroller_set_text   
+00008950: E2800F47    ;                ADD     R0, R0, #LCD_SCROLLER_SIZE              ; get bottom scroller
+00008954: E24F102C    ;                ADR     R1, ui_show_about_sz_bottom             ; set the bottom scroller text
+00008958: EBFFDE13    ;                BL      lcd_scroller_set_text
+0000895C: E8BD8003    ;                POP     {R0, R1, PC}
+00008960:             ; 
+00008960:             ; ;------------------------------------------------------------------------------
+00008960:             ; ; ui_track_changed() - called when the track has changed
+00008960:             ; ;
+00008960:             ; ; I  R0 - ui_module address
+00008960:             ; ;------------------------------------------------------------------------------ 
+00008960:             ; ui_track_changed
+00008960: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+00008964: E5901000    ;                LDR     R1, [R0, #MODULE_UI_PROJECT]            ; get project module address
+00008968: E5911004    ;                LDR     R1, [R1, #MODULE_PROJECT_PLAYER]        ; get player module address
+0000896C:             ; 
+0000896C: E92D0007    ;                PUSH    {R0, R1, R2}
+00008970: E5913008    ;                LDR     R3, [R1, #MODULE_PLAYER_TRACK_NAME]     ; get track name address
+00008974: E2800F91    ;                ADD     R0, R0, #MODULE_UI_BUFFER               ; get buffer address
+00008978: E5911004    ;                LDR     R1, [R1, #MODULE_PLAYER_TRACK_INDEX]    ; get track index
+0000897C: E2811001    ;                ADD     R1, R1, #1                              ; make it base from 1
+00008980: E3A02000    ;                MOV     R2, #0
+00008984: EBFFDED3    ;                BL      int2str
+00008988: E3A0103A    ;                MOV     R1, #':'                                ; append colon
+0000898C: EBFFDEC1    ;                BL      appendchar
+00008990: E2800001    ;                ADD     R0, R0, #1
+00008994: E3A01020    ;                MOV     R1, #' '                                ; append space
+00008998: EBFFDEBE    ;                BL      appendchar
+0000899C: E2800001    ;                ADD     R0, R0, #1
+000089A0: E1A01003    ;                MOV     R1, R3                                  ; write track name
+000089A4: EBFFDEC5    ;                BL      strcpy
+000089A8: E8BD0007    ;                POP     {R0, R1, R2}
+000089AC:             ; 
+000089AC: E1A02000    ;                MOV     R2, R0                                  ; preserve R0
+000089B0: E280000C    ;                ADD     R0, R0, #MODULE_UI_LCD_SCROLLERS        ; get top scroller
+000089B4: E2821F91    ;                ADD     R1, R2, #MODULE_UI_BUFFER
+000089B8: EBFFDDFB    ;                BL      lcd_scroller_set_text                   ; set the top scroller text
+000089BC: E1A00002    ;                MOV     R0, R2                                  ; restore R0
+000089C0:             ; 
+000089C0: EB000011    ;                BL      ui_refresh_time                         ; update track info
+000089C4: E8BD800E    ;                POP     {R1, R2, R3, PC}
+000089C8:             ; 
+000089C8:             ; ;------------------------------------------------------------------------------
+000089C8:             ; ; ui_track_updated() - called when the track has updated, state or time
+000089C8:             ; ;
+000089C8:             ; ; I  R0 - ui_module address
+000089C8:             ; ;------------------------------------------------------------------------------
+000089C8:             ; ui_track_updated
+000089C8: E92D4006    ;                PUSH    {R1, R2, LR}
+000089CC:             ; 
+000089CC: E1A02000    ;                MOV     R2, R0                                  ; preserve R0
+000089D0:             ; 
+000089D0: E2820008    ;                ADD     R0, R2, #MODULE_UI_TIME_SAVETICK
+000089D4: E3A010FA    ;                MOV     R1, #250
+000089D8: EBFFDDE1    ;                BL      has_elapsed_by
+000089DC: E3500000    ;                CMP     R0, #FALSE
+000089E0: 11A00002    ;                MOVNE   R0, R2
+000089E4: 1B000008    ;                BLNE    ui_refresh_time                         ; refresh time and state
+000089E8:             ; 
+000089E8: E2820004    ;                ADD     R0, R2, #MODULE_UI_SCROLL_SAVETICK
+000089EC: E3A01F7D    ;                MOV     R1, #500
+000089F0: EBFFDDDB    ;                BL      has_elapsed_by
+000089F4: E3500000    ;                CMP     R0, #FALSE
+000089F8: 0A000001    ;                BEQ     ui_track_updated_return                 ; refresh time and state
+000089FC:             ; 
+000089FC: E282000C    ;                ADD     R0, R2, #MODULE_UI_LCD_SCROLLERS
+00008A00: EBFFDDFA    ;                BL      lcd_scroller_update
+00008A04:             ; 
+00008A04:             ; ui_track_updated_return
+00008A04: E1A00002    ;                MOV     R0, R2                                  ; restore R0
+00008A08: E8BD8006    ;                POP     {R1, R2, PC}
+00008A0C:             ; 
+00008A0C:             ; ;------------------------------------------------------------------------------
+00008A0C:             ; ; ui_refresh_time() - refresh the track time and state
+00008A0C:             ; ;
+00008A0C:             ; ; I  R0 - ui_module address
+00008A0C:             ; ;------------------------------------------------------------------------------
+00008A0C:             ; ui_refresh_time
+00008A0C: E92D401F    ;                PUSH    {R0, R1, R2, R3, R4, LR}
+00008A10: E5901000    ;                LDR     R1, [R0, #MODULE_UI_PROJECT]            ; get project module address
+00008A14: E5911004    ;                LDR     R1, [R1, #MODULE_PROJECT_PLAYER]        ; get player module address
+00008A18:             ; 
+00008A18: E5912018    ;                LDR     R2, [R1, #MODULE_PLAYER_ELAPSED_TICKS]
+00008A1C: E2803F91    ;                ADD     R3, R0, #MODULE_UI_BUFFER
+00008A20:             ; 
+00008A20: E92D0003    ;                PUSH    {R0, R1}
+00008A24: E1A04000    ;                MOV     R4, R0                                  ; put ui module address in R4
+00008A28: E1A00003    ;                MOV     R0, R3                                  ; write the time
+00008A2C: E5911018    ;                LDR     R1, [R1, #MODULE_PLAYER_ELAPSED_TICKS]
+00008A30: EB000009    ;                BL      ui_write_time
+00008A34:             ; 
+00008A34: E5941000    ;                LDR     R1, [R4, #MODULE_UI_PROJECT]            ; write the current state
+00008A38: E591100C    ;                LDR     R1, [R1, #MODULE_PROJECT_STATE]
+00008A3C: EB00001E    ;                BL      ui_write_state
+00008A40: E8BD0003    ;                POP     {R0, R1}
+00008A44:             ; 
+00008A44: E280200C    ;                ADD     R2, R0, #MODULE_UI_LCD_SCROLLERS        ; get bottom scroller
+00008A48: E2822F47    ;                ADD     R2, R2, #LCD_SCROLLER_SIZE
+00008A4C:             ; 
+00008A4C: E1A00002    ;                MOV     R0, R2                                  ; scroller
+00008A50: E1A01003    ;                MOV     R1, R3                                  ; string
+00008A54: EBFFDDD4    ;                BL      lcd_scroller_set_text
+00008A58:             ; 
+00008A58: E8BD801F    ;                POP     {R0, R1, R2, R3, R4, PC}
+00008A5C:             ; 
+00008A5C:             ; ;------------------------------------------------------------------------------
+00008A5C:             ; ; ui_write_time() - write a time to a string
+00008A5C:             ; ;
+00008A5C:             ; ; IO R0 - destination string address (updated to end)
+00008A5C:             ; ; I  R1 - total milliseconds
+00008A5C:             ; ;
+00008A5C:             ; ;    R1 - minutes
+00008A5C:             ; ;    R3 - seconds
+00008A5C:             ; ;------------------------------------------------------------------------------
+00008A5C:             ; ui_write_time
+00008A5C: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+00008A60:             ; 
+00008A60: E1A03000    ;                MOV     R3, R0                                  ; preserve R0
+00008A64: E1A00001    ;                MOV     R0, R1                                  ; get total seconds
+00008A68: E3A01FFA    ;                MOV     R1, #1000
+00008A6C: EBFFDE72    ;                BL      udivision
+00008A70: E3A0103C    ;                MOV     R1, #60                                 ; get minutes and seconds
+00008A74: EBFFDE70    ;                BL      udivision
+00008A78: E1A01000    ;                MOV     R1, R0
+00008A7C: E1A00003    ;                MOV     R0, R3                                  ; restore R0
+00008A80: E1A03002    ;                MOV     R3, R2
+00008A84:             ; 
+00008A84: E3A02002    ;                MOV     R2, #2                                  ; write minutes
+00008A88: EBFFDE92    ;                BL      int2str
+00008A8C: E3A0103A    ;                MOV     R1, #':'                                ; write colon
+00008A90: EBFFDE80    ;                BL      appendchar
+00008A94: E2800001    ;                ADD     R0, R0, #1
+00008A98: E1A01003    ;                MOV     R1, R3                                  ; write seconds
+00008A9C: EBFFDE8D    ;                BL      int2str
+00008AA0: E8BD800E    ;                POP     {R1, R2, R3, PC}
+00008AA4:             ; 
+00008AA4:             ; ;------------------------------------------------------------------------------
+00008AA4:             ; ; ui_write_state() - write a state to a string
+00008AA4:             ; ;
+00008AA4:             ; ; IO R0 - destination string address (updated to end)
+00008AA4:             ; ; I  R1 - state
+00008AA4:             ; ;------------------------------------------------------------------------------
+00008AA4:             ; ui_write_state_sz_stopped
+00008AA4: 20 2D 20 73 ;                DEFB    " - stopped",0
+00008AA8: 74 6F 70 70 ; 
+00008AAC: 65 64 00    ; 
+00008AB0:             ;                ALIGN
+00008AB0:             ; ui_write_state_sz_playing
+00008AB0: 20 2D 20 70 ;                DEFB    " - playing",0
+00008AB4: 6C 61 79 69 ; 
+00008AB8: 6E 67 00    ; 
+00008ABC:             ;                ALIGN
+00008ABC:             ; ui_write_state
+00008ABC: E92D4002    ;                PUSH    {R1, LR}
+00008AC0: E3510002    ;                CMP     R1, #STATE_PLAYING
+00008AC4: 024F101C    ;                ADREQ   R1, ui_write_state_sz_playing
+00008AC8: 124F102C    ;                ADRNE   R1, ui_write_state_sz_stopped
+00008ACC: EBFFDE7B    ;                BL      strcpy
+00008AD0: EBFFDE6A    ;                BL      strend
+00008AD4: E8BD8002    ;                POP     {R1, PC}
+00008AD8:             ; 
+00008AD8:             ; ;------------------------------------------------------------------------------
+00008AD8:             ; ; ui_handle_input()
+00008AD8:             ; ;
+00008AD8:             ; ; I  R0 - ui_module address
+00008AD8:             ; ;------------------------------------------------------------------------------
+00008AD8:             ; ui_handle_input
+00008AD8: E92D400E    ;                PUSH    {R1, R2, R3, LR}
+00008ADC: E1A02000    ;                MOV     R2, R0
+00008AE0:             ; 
+00008AE0: EF000008    ;                SVC     SVC_KEYPAD_SCAN                         ; scan the keyboard
+00008AE4: E1A01000    ;                MOV     R1, R0
+00008AE8: E5920344    ;                LDR     R0, [R2, #MODULE_UI_LAST_KEYPAD_SCAN]   ; get last scan
+00008AEC: E5821344    ;                STR     R1, [R2, #MODULE_UI_LAST_KEYPAD_SCAN]   ; set last scan to new scan
+00008AF0: EBFFDE28    ;                BL      keypad_get_new_presses                  ; get new presses
+00008AF4: EBFFDE30    ;                BL      keypad_scan_read_index
+00008AF8:             ; 
+00008AF8: E3710001    ;                CMP     R1, #KEYPAD_NOBUTTON
+00008AFC: 0A00002E    ;                BEQ     ui_handle_input_return
+00008B00: E3510008    ;                CMP     R1, #8
+00008B04: DA00000D    ;                BLE     ui_handle_input_track
+00008B08: E3510009    ;                CMP     R1, #KEYPAD_IDX_ASTERISK
+00008B0C: 0A000019    ;                BEQ     ui_handle_input_stop
+00008B10: E351000A    ;                CMP     R1, #KEYPAD_IDX_0
+00008B14: 0A000002    ;                BEQ     ui_handle_input_about
+00008B18: E351000B    ;                CMP     R1, #KEYPAD_IDX_HASH
+00008B1C: 0A00001D    ;                BEQ     ui_handle_input_play
+00008B20: EA000025    ;                B       ui_handle_input_return
+00008B24:             ; 
+00008B24:             ; ui_handle_input_about
+00008B24: E5923000    ;                LDR     R3, [R2, #MODULE_UI_PROJECT]            ; get project module address
+00008B28: E3A01000    ;                MOV     R1, #STATE_ABOUT                        ; set about state
+00008B2C: E583100C    ;                STR     R1, [R3, #MODULE_PROJECT_STATE]
+00008B30: E1A00002    ;                MOV     R0, R2                                  ; show about page
+00008B34: EBFFFF81    ;                BL      ui_show_about
+00008B38: EBFFFF3D    ;                BL      player_stop_all_channels                ; stop any notes currently playi
+                      ; ng
+00008B3C: EA00001E    ;                B       ui_handle_input_return
+00008B40:             ; 
+00008B40:             ; ui_handle_input_track
+00008B40: E5923000    ;                LDR     R3, [R2, #MODULE_UI_PROJECT]            ; get project module address
+00008B44: E5930008    ;                LDR     R0, [R3, #MODULE_PROJECT_MUSIC]         ; get music data address
+00008B48: E5900000    ;                LDR     R0, [R0, #(tl_track_count-music_data)]  ; get number of tracks
+00008B4C: E1510000    ;                CMP     R1, R0                                  ; check if track is out of range
+00008B50: AA000019    ;                BGE     ui_handle_input_return
+00008B54:             ; 
+00008B54: E5930004    ;                LDR     R0, [R3, #MODULE_PROJECT_PLAYER]        ; get player module address
+00008B58: EBFFFEA8    ;                BL      player_load_track                       ; load the track
+00008B5C: E1A00002    ;                MOV     R0, R2
+00008B60: EBFFFF7E    ;                BL      ui_track_changed
+00008B64:             ; 
+00008B64: E593100C    ;                LDR     R1, [R3, #MODULE_PROJECT_STATE]         ; check if in about state
+00008B68: E3510000    ;                CMP     R1, #STATE_ABOUT
+00008B6C: 03A01002    ;                MOVEQ   R1, #STATE_PLAYING                      ; set to playing state
+00008B70: 0583100C    ;                STREQ   R1, [R3, #MODULE_PROJECT_STATE]
+00008B74: EA000010    ;                B       ui_handle_input_return
+00008B78:             ; 
+00008B78:             ; ui_handle_input_stop
+00008B78: E5923000    ;                LDR     R3, [R2, #MODULE_UI_PROJECT]            ; get project module address
+00008B7C: E593100C    ;                LDR     R1, [R3, #MODULE_PROJECT_STATE]         ; check if in about state
+00008B80: E3510000    ;                CMP     R1, #STATE_ABOUT
+00008B84: 0A00000C    ;                BEQ     ui_handle_input_return
+00008B88: E3A01001    ;                MOV     R1, #STATE_STOPPED                      ; set to stopped state
+00008B8C: E583100C    ;                STR     R1, [R3, #MODULE_PROJECT_STATE]
+00008B90: EBFFFF27    ;                BL      player_stop_all_channels                ; stop any notes currently playi
+                      ; ng
+00008B94: EA000008    ;                B       ui_handle_input_return
+00008B98:             ; 
+00008B98:             ; ui_handle_input_play
+00008B98: E5923000    ;                LDR     R3, [R2, #MODULE_UI_PROJECT]            ; get project module address
+00008B9C: E593100C    ;                LDR     R1, [R3, #MODULE_PROJECT_STATE]         ; check if in about state
+00008BA0: E3510000    ;                CMP     R1, #STATE_ABOUT
+00008BA4: 0A000004    ;                BEQ     ui_handle_input_return
+00008BA8: E3510003    ;                CMP     R1, #STATE_FINISHED                     ; check if in finished state
+00008BAC: 0A000002    ;                BEQ     ui_handle_input_return
+00008BB0: E3A01002    ;                MOV     R1, #STATE_PLAYING                      ; set to playing state
+00008BB4: E583100C    ;                STR     R1, [R3, #MODULE_PROJECT_STATE]
+00008BB8: EAFFFFFF    ;                B       ui_handle_input_return
+00008BBC:             ;                
+00008BBC:             ; ui_handle_input_return
+00008BBC: E1A00002    ;                MOV     R0, R2
+00008BC0: E8BD800E    ;                POP     {R1, R2, R3, PC}
+00008BC4:             ; 
+00008BC4:             ; 
+00008BC4:             ; 
+00008BC4:             ; 
+00008BC4:             ; 
+00008BC4:             ; 
+00008BC4:             ; ;------------------------------------------------------------------------------
+00008BC4:             ; ; Include the music data
+00008BC4:             ; ;------------------------------------------------------------------------------
+00008BC4:             ; music_data
+00008BC4:             ;                INCLUDE ./music_data.s
+00008BC4:             ; ;-------------------------------------------------------------------------------
+00008BC4:             ; ; Generated by noteseq at 16/04/2013 01:04:06 PM
+00008BC4:             ; ;-------------------------------------------------------------------------------
+00008BC4:             ; tl_track_count
+00008BC4: 00000005    ;   DEFW 5
+00008BC8:             ; tl_seq_count
+00008BC8: 00000016    ;   DEFW 22
+00008BCC:             ; 
+00008BCC:             ; ;-------------------------------------------------------------------------------
+00008BCC:             ; tl_tracks
+00008BCC: 00008C38    ;   DEFW tl_track_00
+00008BD0: 00008C7C    ;   DEFW tl_track_01
+00008BD4: 00008CB4    ;   DEFW tl_track_02
+00008BD8: 00008CD0    ;   DEFW tl_track_03
+00008BDC: 00008D24    ;   DEFW tl_track_04
+00008BE0:             ; ;-------------------------------------------------------------------------------
+00008BE0:             ; tl_seq
+00008BE0: 00008D44    ;   DEFW tl_seq_0000
+00008BE4: 00008DB4    ;   DEFW tl_seq_0001
+00008BE8: 00008E10    ;   DEFW tl_seq_0002
+00008BEC: 00008E48    ;   DEFW tl_seq_0003
+00008BF0: 00008E8C    ;   DEFW tl_seq_0004
+00008BF4: 00008F50    ;   DEFW tl_seq_0005
+00008BF8: 00008F80    ;   DEFW tl_seq_0006
+00008BFC: 00008FA8    ;   DEFW tl_seq_0007
+00008C00: 00008FC4    ;   DEFW tl_seq_0008
+00008C04: 00008FDC    ;   DEFW tl_seq_0009
+00008C08: 000091D8    ;   DEFW tl_seq_0010
+00008C0C: 000092E4    ;   DEFW tl_seq_0011
+00008C10: 000092F8    ;   DEFW tl_seq_0012
+00008C14: 00009300    ;   DEFW tl_seq_0013
+00008C18: 00009318    ;   DEFW tl_seq_0014
+00008C1C: 00009330    ;   DEFW tl_seq_0015
+00008C20: 00009350    ;   DEFW tl_seq_0016
+00008C24: 00009368    ;   DEFW tl_seq_0017
+00008C28: 00009390    ;   DEFW tl_seq_0018
+00008C2C: 000093AC    ;   DEFW tl_seq_0019
+00008C30: 000093C8    ;   DEFW tl_seq_0020
+00008C34: 000093DC    ;   DEFW tl_seq_0021
+00008C38:             ; ;-------------------------------------------------------------------------------
+00008C38:             ; tl_track_00
+00008C38: 53 63 72 61 ;   DEFB "Scrap Brain Zone", 0
+00008C3C: 70 20 42 72 ; 
+00008C40: 61 69 6E 20 ; 
+00008C44: 5A 6F 6E 65 ; 
+00008C48: 00          ; 
+00008C4C:             ;   ALIGN
+00008C4C: 0000008C    ;   DEFW 140
+00008C50: 00000001    ;   DEFW 1
+00008C54: 00000000    ;   DEFW 0, 1, 1, 2, 2, 3, 3, 3, 3, -1
+00008C58: 00000001    ; 
+00008C5C: 00000001    ; 
+00008C60: 00000002    ; 
+00008C64: 00000002    ; 
+00008C68: 00000003    ; 
+00008C6C: 00000003    ; 
+00008C70: 00000003    ; 
+00008C74: 00000003    ; 
+00008C78: FFFFFFFF    ; 
+00008C7C:             ; ;-------------------------------------------------------------------------------
+00008C7C:             ; tl_track_01
+00008C7C: 4A 69 6E 67 ;   DEFB "Jingle Bells", 0
+00008C80: 6C 65 20 42 ; 
+00008C84: 65 6C 6C 73 ; 
+00008C88: 00          ; 
+00008C8C:             ;   ALIGN
+00008C8C: 000000C8    ;   DEFW 200
+00008C90: 00000001    ;   DEFW 1
+00008C94: 00000004    ;   DEFW 4, 5, 6, 7, 5, 6, 8, -1
+00008C98: 00000005    ; 
+00008C9C: 00000006    ; 
+00008CA0: 00000007    ; 
+00008CA4: 00000005    ; 
+00008CA8: 00000006    ; 
+00008CAC: 00000008    ; 
+00008CB0: FFFFFFFF    ; 
+00008CB4:             ; ;-------------------------------------------------------------------------------
+00008CB4:             ; tl_track_02
+00008CB4: 53 75 70 65 ;   DEFB "Super Mario", 0
+00008CB8: 72 20 4D 61 ; 
+00008CBC: 72 69 6F 00 ; 
+00008CC0:             ;   ALIGN
+00008CC0: 00000118    ;   DEFW 280
+00008CC4: 00000001    ;   DEFW 1
+00008CC8: 00000009    ;   DEFW 9, -1
+00008CCC: FFFFFFFF    ; 
+00008CD0:             ; ;-------------------------------------------------------------------------------
+00008CD0:             ; tl_track_03
+00008CD0: 4E 65 76 65 ;   DEFB "Never gonna give you up", 0
+00008CD4: 72 20 67 6F ; 
+00008CD8: 6E 6E 61 20 ; 
+00008CDC: 67 69 76 65 ; 
+00008CE0: 20 79 6F 75 ; 
+00008CE4: 20 75 70 00 ; 
+00008CE8:             ;   ALIGN
+00008CE8: 00000072    ;   DEFW 114
+00008CEC: 00000001    ;   DEFW 1
+00008CF0: 0000000B    ;   DEFW 11, 13, 11, 15, 11, 17, 11, 13, 11, 19, 11, 17, -1
+00008CF4: 0000000D    ; 
+00008CF8: 0000000B    ; 
+00008CFC: 0000000F    ; 
+00008D00: 0000000B    ; 
+00008D04: 00000011    ; 
+00008D08: 0000000B    ; 
+00008D0C: 0000000D    ; 
+00008D10: 0000000B    ; 
+00008D14: 00000013    ; 
+00008D18: 0000000B    ; 
+00008D1C: 00000011    ; 
+00008D20: FFFFFFFF    ; 
+00008D24:             ; ;-------------------------------------------------------------------------------
+00008D24:             ; tl_track_04
+00008D24: 57 61 74 65 ;   DEFB "Watery Graves", 0
+00008D28: 72 79 20 47 ; 
+00008D2C: 72 61 76 65 ; 
+00008D30: 73 00       ; 
+00008D34:             ;   ALIGN
+00008D34: 00000078    ;   DEFW 120
+00008D38: 00000001    ;   DEFW 1
+00008D3C: 00000015    ;   DEFW 21, -1
+00008D40: FFFFFFFF    ; 
+00008D44:             ; 
+00008D44:             ; ;-------------------------------------------------------------------------------
+00008D44:             ; tl_seq_0000
+00008D44: 1000040A    ;   DEFW &1000040A, &2000040C, &10000501, &10000500, &10000505, &10000506
+00008D48: 2000040C    ; 
+00008D4C: 10000501    ; 
+00008D50: 10000500    ; 
+00008D54: 10000505    ; 
+00008D58: 10000506    ; 
+00008D5C: 50000508    ;   DEFW &50000508, &10000505, &10000503, &10000501, &1000040C, &10000506
+00008D60: 10000505    ; 
+00008D64: 10000503    ; 
+00008D68: 10000501    ; 
+00008D6C: 1000040C    ; 
+00008D70: 10000506    ; 
+00008D74: 10000505    ;   DEFW &10000505, &10000503, &10000501, &10000508, &10000506, &10000505
+00008D78: 10000503    ; 
+00008D7C: 10000501    ; 
+00008D80: 10000508    ; 
+00008D84: 10000506    ; 
+00008D88: 10000505    ; 
+00008D8C: 10000503    ;   DEFW &10000503, &1000050A, &10000508, &10000506, &10000505, &1000050C
+00008D90: 1000050A    ; 
+00008D94: 10000508    ; 
+00008D98: 10000506    ; 
+00008D9C: 10000505    ; 
+00008DA0: 1000050C    ; 
+00008DA4: 1000050A    ;   DEFW &1000050A, &10000508, &10000506, &00000000
+00008DA8: 10000508    ; 
+00008DAC: 10000506    ; 
+00008DB0: 00000000    ; 
+00008DB4:             ; ;-------------------------------------------------------------------------------
+00008DB4:             ; tl_seq_0001
+00008DB4: A000050A    ;   DEFW &A000050A, &20000508, &20000506, &20000508, &00010505, &A0000508
+00008DB8: 20000508    ; 
+00008DBC: 20000506    ; 
+00008DC0: 20000508    ; 
+00008DC4: 00010505    ; 
+00008DC8: A0000508    ; 
+00008DCC: 20000506    ;   DEFW &20000506, &20000505, &20000506, &00010503, &A0000506, &20000504
+00008DD0: 20000505    ; 
+00008DD4: 20000506    ; 
+00008DD8: 00010503    ; 
+00008DDC: A0000506    ; 
+00008DE0: 20000504    ; 
+00008DE4: 20000503    ;   DEFW &20000503, &20000504, &80000501, &80000503, &10000505, &10000506
+00008DE8: 20000504    ; 
+00008DEC: 80000501    ; 
+00008DF0: 80000503    ; 
+00008DF4: 10000505    ; 
+00008DF8: 10000506    ; 
+00008DFC: 60000505    ;   DEFW &60000505, &80000506, &80000508, &80000509, &00000000
+00008E00: 80000506    ; 
+00008E04: 80000508    ; 
+00008E08: 80000509    ; 
+00008E0C: 00000000    ; 
+00008E10:             ; ;-------------------------------------------------------------------------------
+00008E10:             ; tl_seq_0002
+00008E10: 1000040A    ;   DEFW &1000040A, &1000040A, &10000409, &1000040A, &10000408, &10000408
+00008E14: 1000040A    ; 
+00008E18: 10000409    ; 
+00008E1C: 1000040A    ; 
+00008E20: 10000408    ; 
+00008E24: 10000408    ; 
+00008E28: 1000040A    ;   DEFW &1000040A, &1000040A, &10000409, &10000409, &10000408, &10000408
+00008E2C: 1000040A    ; 
+00008E30: 10000409    ; 
+00008E34: 10000409    ; 
+00008E38: 10000408    ; 
+00008E3C: 10000408    ; 
+00008E40: 40000400    ;   DEFW &40000400, &00000000
+00008E44: 00000000    ; 
+00008E48:             ; ;-------------------------------------------------------------------------------
+00008E48:             ; tl_seq_0003
+00008E48: A0000508    ;   DEFW &A0000508, &20000505, &20000501, &20000601, &4000050B, &20000601
+00008E4C: 20000505    ; 
+00008E50: 20000501    ; 
+00008E54: 20000601    ; 
+00008E58: 4000050B    ; 
+00008E5C: 20000601    ; 
+00008E60: 4000050B    ;   DEFW &4000050B, &20000506, &2000050B, &C000050A, &20000505, &20000506
+00008E64: 20000506    ; 
+00008E68: 2000050B    ; 
+00008E6C: C000050A    ; 
+00008E70: 20000505    ; 
+00008E74: 20000506    ; 
+00008E78: 60000508    ;   DEFW &60000508, &2000050A, &60000508, &40000505, &00000000
+00008E7C: 2000050A    ; 
+00008E80: 60000508    ; 
+00008E84: 40000505    ; 
+00008E88: 00000000    ; 
+00008E8C:             ; ;-------------------------------------------------------------------------------
+00008E8C:             ; tl_seq_0004
+00008E8C: 40000303    ;   DEFW &40000303, &4000030C, &4000030A, &40000308, &C0000303, &20000303
+00008E90: 4000030C    ; 
+00008E94: 4000030A    ; 
+00008E98: 40000308    ; 
+00008E9C: C0000303    ; 
+00008EA0: 20000303    ; 
+00008EA4: 20000303    ;   DEFW &20000303, &40000303, &4000030C, &4000030A, &40000308, &00010305
+00008EA8: 40000303    ; 
+00008EAC: 4000030C    ; 
+00008EB0: 4000030A    ; 
+00008EB4: 40000308    ; 
+00008EB8: 00010305    ; 
+00008EBC: 40000305    ;   DEFW &40000305, &40000401, &4000030C, &4000030A, &00010307, &40000403
+00008EC0: 40000401    ; 
+00008EC4: 4000030C    ; 
+00008EC8: 4000030A    ; 
+00008ECC: 00010307    ; 
+00008ED0: 40000403    ; 
+00008ED4: 40000403    ;   DEFW &40000403, &40000401, &4000030A, &0001030C, &40000303, &4000030C
+00008ED8: 40000401    ; 
+00008EDC: 4000030A    ; 
+00008EE0: 0001030C    ; 
+00008EE4: 40000303    ; 
+00008EE8: 4000030C    ; 
+00008EEC: 4000030A    ;   DEFW &4000030A, &40000308, &00010303, &40000303, &4000030C, &4000030A
+00008EF0: 40000308    ; 
+00008EF4: 00010303    ; 
+00008EF8: 40000303    ; 
+00008EFC: 4000030C    ; 
+00008F00: 4000030A    ; 
+00008F04: 40000308    ;   DEFW &40000308, &C0000305, &40000305, &40000305, &40000401, &4000030C
+00008F08: C0000305    ; 
+00008F0C: 40000305    ; 
+00008F10: 40000305    ; 
+00008F14: 40000401    ; 
+00008F18: 4000030C    ; 
+00008F1C: 4000030A    ;   DEFW &4000030A, &40000403, &40000403, &40000403, &40000403, &40000405
+00008F20: 40000403    ; 
+00008F24: 40000403    ; 
+00008F28: 40000403    ; 
+00008F2C: 40000403    ; 
+00008F30: 40000405    ; 
+00008F34: 40000403    ;   DEFW &40000403, &40000401, &4000030A, &40000308, &40000300, &80000403
+00008F38: 40000401    ; 
+00008F3C: 4000030A    ; 
+00008F40: 40000308    ; 
+00008F44: 40000300    ; 
+00008F48: 80000403    ; 
+00008F4C: 00000000    ;   DEFW &00000000
+00008F50:             ; ;-------------------------------------------------------------------------------
+00008F50:             ; tl_seq_0005
+00008F50: 4000030C    ;   DEFW &4000030C, &4000030C, &8000030C, &4000030C, &4000030C, &8000030C
+00008F54: 4000030C    ; 
+00008F58: 8000030C    ; 
+00008F5C: 4000030C    ; 
+00008F60: 4000030C    ; 
+00008F64: 8000030C    ; 
+00008F68: 4000030C    ;   DEFW &4000030C, &40000403, &60000308, &2000030A, &0001030C, &00000000
+00008F6C: 40000403    ; 
+00008F70: 60000308    ; 
+00008F74: 2000030A    ; 
+00008F78: 0001030C    ; 
+00008F7C: 00000000    ; 
+00008F80:             ; ;-------------------------------------------------------------------------------
+00008F80:             ; tl_seq_0006
+00008F80: 40000401    ;   DEFW &40000401, &40000401, &40000401, &40000401, &40000401, &4000030C
+00008F84: 40000401    ; 
+00008F88: 40000401    ; 
+00008F8C: 40000401    ; 
+00008F90: 40000401    ; 
+00008F94: 4000030C    ; 
+00008F98: 4000030C    ;   DEFW &4000030C, &2000030C, &2000030C, &00000000
+00008F9C: 2000030C    ; 
+00008FA0: 2000030C    ; 
+00008FA4: 00000000    ; 
+00008FA8:             ; ;-------------------------------------------------------------------------------
+00008FA8:             ; tl_seq_0007
+00008FA8: 4000030C    ;   DEFW &4000030C, &4000030A, &4000030A, &4000030C, &8000030A, &80000403
+00008FAC: 4000030A    ; 
+00008FB0: 4000030A    ; 
+00008FB4: 4000030C    ; 
+00008FB8: 8000030A    ; 
+00008FBC: 80000403    ; 
+00008FC0: 00000000    ;   DEFW &00000000
+00008FC4:             ; ;-------------------------------------------------------------------------------
+00008FC4:             ; tl_seq_0008
+00008FC4: 40000403    ;   DEFW &40000403, &40000403, &40000401, &4000030A, &00010308, &00000000
+00008FC8: 40000403    ; 
+00008FCC: 40000401    ; 
+00008FD0: 4000030A    ; 
+00008FD4: 00010308    ; 
+00008FD8: 00000000    ; 
+00008FDC:             ; ;-------------------------------------------------------------------------------
+00008FDC:             ; tl_seq_0009
+00008FDC: 40000405    ;   DEFW &40000405, &40000405, &40000400, &40000405, &40000400, &40000401
+00008FE0: 40000405    ; 
+00008FE4: 40000400    ; 
+00008FE8: 40000405    ; 
+00008FEC: 40000400    ; 
+00008FF0: 40000401    ; 
+00008FF4: 40000405    ;   DEFW &40000405, &40000400, &40000408, &40000400, &80000400, &40000308
+00008FF8: 40000400    ; 
+00008FFC: 40000408    ; 
+00009000: 40000400    ; 
+00009004: 80000400    ; 
+00009008: 40000308    ; 
+0000900C: 40000300    ;   DEFW &40000300, &80000300, &40000401, &40000400, &40000400, &40000308
+00009010: 80000300    ; 
+00009014: 40000401    ; 
+00009018: 40000400    ; 
+0000901C: 40000400    ; 
+00009020: 40000308    ; 
+00009024: 80000300    ;   DEFW &80000300, &40000305, &40000300, &40000300, &4000030A, &40000300
+00009028: 40000305    ; 
+0000902C: 40000300    ; 
+00009030: 40000300    ; 
+00009034: 4000030A    ; 
+00009038: 40000300    ; 
+0000903C: 4000030C    ;   DEFW &4000030C, &40000300, &4000030B, &4000030A, &40000300, &55000308
+00009040: 40000300    ; 
+00009044: 4000030B    ; 
+00009048: 4000030A    ; 
+0000904C: 40000300    ; 
+00009050: 55000308    ; 
+00009054: 40000405    ;   DEFW &40000405, &40000408, &4000040A, &40000400, &40000406, &40000408
+00009058: 40000408    ; 
+0000905C: 4000040A    ; 
+00009060: 40000400    ; 
+00009064: 40000406    ; 
+00009068: 40000408    ; 
+0000906C: 40000400    ;   DEFW &40000400, &40000405, &40000400, &40000401, &40000403, &4000030C
+00009070: 40000405    ; 
+00009074: 40000400    ; 
+00009078: 40000401    ; 
+0000907C: 40000403    ; 
+00009080: 4000030C    ; 
+00009084: 80000300    ;   DEFW &80000300, &40000401, &40000400, &40000400, &40000308, &80000300
+00009088: 40000401    ; 
+0000908C: 40000400    ; 
+00009090: 40000400    ; 
+00009094: 40000308    ; 
+00009098: 80000300    ; 
+0000909C: 40000305    ;   DEFW &40000305, &40000300, &40000300, &4000030A, &40000300, &4000030C
+000090A0: 40000300    ; 
+000090A4: 40000300    ; 
+000090A8: 4000030A    ; 
+000090AC: 40000300    ; 
+000090B0: 4000030C    ; 
+000090B4: 40000300    ;   DEFW &40000300, &4000030B, &4000030A, &40000300, &55000308, &40000405
+000090B8: 4000030B    ; 
+000090BC: 4000030A    ; 
+000090C0: 40000300    ; 
+000090C4: 55000308    ; 
+000090C8: 40000405    ; 
+000090CC: 40000408    ;   DEFW &40000408, &4000040A, &40000400, &40000406, &40000408, &40000400
+000090D0: 4000040A    ; 
+000090D4: 40000400    ; 
+000090D8: 40000406    ; 
+000090DC: 40000408    ; 
+000090E0: 40000400    ; 
+000090E4: 40000405    ;   DEFW &40000405, &40000400, &40000401, &40000403, &4000030C, &80000300
+000090E8: 40000400    ; 
+000090EC: 40000401    ; 
+000090F0: 40000403    ; 
+000090F4: 4000030C    ; 
+000090F8: 80000300    ; 
+000090FC: 80000300    ;   DEFW &80000300, &40000408, &40000407, &40000406, &40000404, &40000400
+00009100: 40000408    ; 
+00009104: 40000407    ; 
+00009108: 40000406    ; 
+0000910C: 40000404    ; 
+00009110: 40000400    ; 
+00009114: 40000405    ;   DEFW &40000405, &40000400, &40000309, &4000030A, &40000308, &40000300
+00009118: 40000400    ; 
+0000911C: 40000309    ; 
+00009120: 4000030A    ; 
+00009124: 40000308    ; 
+00009128: 40000300    ; 
+0000912C: 4000030A    ;   DEFW &4000030A, &40000401, &40000403, &80000400, &40000408, &40000407
+00009130: 40000401    ; 
+00009134: 40000403    ; 
+00009138: 80000400    ; 
+0000913C: 40000408    ; 
+00009140: 40000407    ; 
+00009144: 40000406    ;   DEFW &40000406, &40000404, &40000400, &40000405, &40000400, &40000501
+00009148: 40000404    ; 
+0000914C: 40000400    ; 
+00009150: 40000405    ; 
+00009154: 40000400    ; 
+00009158: 40000501    ; 
+0000915C: 40000500    ;   DEFW &40000500, &40000501, &40000501, &40000500, &80000500, &80000500
+00009160: 40000501    ; 
+00009164: 40000501    ; 
+00009168: 40000500    ; 
+0000916C: 80000500    ; 
+00009170: 80000500    ; 
+00009174: 40000408    ;   DEFW &40000408, &40000407, &40000406, &40000404, &40000400, &40000405
+00009178: 40000407    ; 
+0000917C: 40000406    ; 
+00009180: 40000404    ; 
+00009184: 40000400    ; 
+00009188: 40000405    ; 
+0000918C: 40000400    ;   DEFW &40000400, &40000309, &4000030A, &40000308, &40000300, &4000030A
+00009190: 40000309    ; 
+00009194: 4000030A    ; 
+00009198: 40000308    ; 
+0000919C: 40000300    ; 
+000091A0: 4000030A    ; 
+000091A4: 40000401    ;   DEFW &40000401, &40000403, &80000400, &40000408, &40000400, &40000400
+000091A8: 40000403    ; 
+000091AC: 80000400    ; 
+000091B0: 40000408    ; 
+000091B4: 40000400    ; 
+000091B8: 40000400    ; 
+000091BC: 40000403    ;   DEFW &40000403, &80000400, &40000403, &40000400, &80000400, &00010400
+000091C0: 80000400    ; 
+000091C4: 40000403    ; 
+000091C8: 40000400    ; 
+000091CC: 80000400    ; 
+000091D0: 00010400    ; 
+000091D4: 00000000    ;   DEFW &00000000
+000091D8:             ; ;-------------------------------------------------------------------------------
+000091D8:             ; tl_seq_0010
+000091D8: 40000406    ;   DEFW &40000406, &20000408, &80000408, &60000408, &2000040A, &8000040A
+000091DC: 20000408    ; 
+000091E0: 80000408    ; 
+000091E4: 60000408    ; 
+000091E8: 2000040A    ; 
+000091EC: 8000040A    ; 
+000091F0: 10000501    ;   DEFW &10000501, &1000040C, &2000040A, &40000406, &20000408, &80000408
+000091F4: 1000040C    ; 
+000091F8: 2000040A    ; 
+000091FC: 40000406    ; 
+00009200: 20000408    ; 
+00009204: 80000408    ; 
+00009208: 60000401    ;   DEFW &60000401, &20000400, &20000400, &10000401, &10000401, &10000403
+0000920C: 20000400    ; 
+00009210: 20000400    ; 
+00009214: 10000401    ; 
+00009218: 10000401    ; 
+0000921C: 10000403    ; 
+00009220: 20000406    ;   DEFW &20000406, &10000406, &40000406, &20000408, &80000408, &60000408
+00009224: 10000406    ; 
+00009228: 40000406    ; 
+0000922C: 20000408    ; 
+00009230: 80000408    ; 
+00009234: 60000408    ; 
+00009238: 2000040A    ;   DEFW &2000040A, &8000040A, &10000501, &1000040C, &2000040A, &40000406
+0000923C: 8000040A    ; 
+00009240: 10000501    ; 
+00009244: 1000040C    ; 
+00009248: 2000040A    ; 
+0000924C: 40000406    ; 
+00009250: 20000408    ;   DEFW &20000408, &80000408, &60000401, &20000400, &20000400, &10000401
+00009254: 80000408    ; 
+00009258: 60000401    ; 
+0000925C: 20000400    ; 
+00009260: 20000400    ; 
+00009264: 10000401    ; 
+00009268: 10000401    ;   DEFW &10000401, &10000403, &20000406, &10000406, &20000405, &20000406
+0000926C: 10000403    ; 
+00009270: 20000406    ; 
+00009274: 10000406    ; 
+00009278: 20000405    ; 
+0000927C: 20000406    ; 
+00009280: 40000406    ;   DEFW &40000406, &40000400, &10000406, &20000406, &10000406, &80000406
+00009284: 40000400    ; 
+00009288: 10000406    ; 
+0000928C: 20000406    ; 
+00009290: 10000406    ; 
+00009294: 80000406    ; 
+00009298: 20000406    ;   DEFW &20000406, &20000408, &2000040A, &20000406, &20000408, &20000408
+0000929C: 20000408    ; 
+000092A0: 2000040A    ; 
+000092A4: 20000406    ; 
+000092A8: 20000408    ; 
+000092AC: 20000408    ; 
+000092B0: 20000408    ;   DEFW &20000408, &2000040A, &40000408, &40000401, &80000400, &20000403
+000092B4: 2000040A    ; 
+000092B8: 40000408    ; 
+000092BC: 40000401    ; 
+000092C0: 80000400    ; 
+000092C4: 20000403    ; 
+000092C8: 20000405    ;   DEFW &20000405, &20000406, &20000403, &20000400, &20000405, &80000405
+000092CC: 20000406    ; 
+000092D0: 20000403    ; 
+000092D4: 20000400    ; 
+000092D8: 20000405    ; 
+000092DC: 80000405    ; 
+000092E0: 00000000    ;   DEFW &00000000
+000092E4:             ; ;-------------------------------------------------------------------------------
+000092E4:             ; tl_seq_0011
+000092E4: 10000401    ;   DEFW &10000401, &10000403, &10000406, &10000403, &00000000
+000092E8: 10000403    ; 
+000092EC: 10000406    ; 
+000092F0: 10000403    ; 
+000092F4: 00000000    ; 
+000092F8:             ; ;-------------------------------------------------------------------------------
+000092F8:             ; tl_seq_0012
+000092F8: 40000400    ;   DEFW &40000400, &00000000
+000092FC: 00000000    ; 
+00009300:             ; ;-------------------------------------------------------------------------------
+00009300:             ; tl_seq_0013
+00009300: 3000040A    ;   DEFW &3000040A, &1000040A, &2000040A, &20000408, &40000408, &00000000
+00009304: 1000040A    ; 
+00009308: 2000040A    ; 
+0000930C: 20000408    ; 
+00009310: 40000408    ; 
+00009314: 00000000    ; 
+00009318:             ; ;-------------------------------------------------------------------------------
+00009318:             ; tl_seq_0014
+00009318: 30000304    ;   DEFW &30000304, &10000304, &20000304, &20000306, &40000306, &00000000
+0000931C: 10000304    ; 
+00009320: 20000304    ; 
+00009324: 20000306    ; 
+00009328: 40000306    ; 
+0000932C: 00000000    ; 
+00009330:             ; ;-------------------------------------------------------------------------------
+00009330:             ; tl_seq_0015
+00009330: 30000408    ;   DEFW &30000408, &10000408, &20000408, &20000406, &10000406, &10000405
+00009334: 10000408    ; 
+00009338: 20000408    ; 
+0000933C: 20000406    ; 
+00009340: 10000406    ; 
+00009344: 10000405    ; 
+00009348: 20000406    ;   DEFW &20000406, &00000000
+0000934C: 00000000    ; 
+00009350:             ; ;-------------------------------------------------------------------------------
+00009350:             ; tl_seq_0016
+00009350: 30000303    ;   DEFW &30000303, &10000303, &20000303, &20000308, &40000308, &00000000
+00009354: 10000303    ; 
+00009358: 20000303    ; 
+0000935C: 20000308    ; 
+00009360: 40000308    ; 
+00009364: 00000000    ; 
+00009368:             ; ;-------------------------------------------------------------------------------
+00009368:             ; tl_seq_0017
+00009368: 40000406    ;   DEFW &40000406, &20000408, &20000405, &10000405, &10000403, &40000401
+0000936C: 20000408    ; 
+00009370: 20000405    ; 
+00009374: 10000405    ; 
+00009378: 10000403    ; 
+0000937C: 40000401    ; 
+00009380: 20000401    ;   DEFW &20000401, &40000408, &80000406, &00000000
+00009384: 40000408    ; 
+00009388: 80000406    ; 
+0000938C: 00000000    ; 
+00009390:             ; ;-------------------------------------------------------------------------------
+00009390:             ; tl_seq_0018
+00009390: 60000301    ;   DEFW &60000301, &20000306, &40000306, &40000306, &4000030A, &80000308
+00009394: 20000306    ; 
+00009398: 40000306    ; 
+0000939C: 40000306    ; 
+000093A0: 4000030A    ; 
+000093A4: 80000308    ; 
+000093A8: 00000000    ;   DEFW &00000000
+000093AC:             ; ;-------------------------------------------------------------------------------
+000093AC:             ; tl_seq_0019
+000093AC: 40000501    ;   DEFW &40000501, &20000405, &20000406, &10000406, &10000405, &20000403
+000093B0: 20000405    ; 
+000093B4: 20000406    ; 
+000093B8: 10000406    ; 
+000093BC: 10000405    ; 
+000093C0: 20000403    ; 
+000093C4: 00000000    ;   DEFW &00000000
+000093C8:             ; ;-------------------------------------------------------------------------------
+000093C8:             ; tl_seq_0020
+000093C8: 40000303    ;   DEFW &40000303, &20000303, &20000308, &40000308, &00000000
+000093CC: 20000303    ; 
+000093D0: 20000308    ; 
+000093D4: 40000308    ; 
+000093D8: 00000000    ; 
+000093DC:             ; ;-------------------------------------------------------------------------------
+000093DC:             ; tl_seq_0021
+000093DC: 20000300    ;   DEFW &20000300, &2000040A, &20000409, &20000405, &20000408, &20000407
+000093E0: 2000040A    ; 
+000093E4: 20000409    ; 
+000093E8: 20000405    ; 
+000093EC: 20000408    ; 
+000093F0: 20000407    ; 
+000093F4: 40000400    ;   DEFW &40000400, &2000040A, &20000505, &2000050A, &20000505, &2000040A
+000093F8: 2000040A    ; 
+000093FC: 20000505    ; 
+00009400: 2000050A    ; 
+00009404: 20000505    ; 
+00009408: 2000040A    ; 
+0000940C: 20000505    ;   DEFW &20000505, &2000050A, &20000500, &20000500, &2000040A, &20000409
+00009410: 2000050A    ; 
+00009414: 20000500    ; 
+00009418: 20000500    ; 
+0000941C: 2000040A    ; 
+00009420: 20000409    ; 
+00009424: 20000405    ;   DEFW &20000405, &20000408, &20000407, &20000400, &20000407, &2000040A
+00009428: 20000408    ; 
+0000942C: 20000407    ; 
+00009430: 20000400    ; 
+00009434: 20000407    ; 
+00009438: 2000040A    ; 
+0000943C: 20000505    ;   DEFW &20000505, &2000050A, &20000605, &2000050A, &20000405, &20000404
+00009440: 2000050A    ; 
+00009444: 20000605    ; 
+00009448: 2000050A    ; 
+0000944C: 20000405    ; 
+00009450: 20000404    ; 
+00009454: 20000406    ;   DEFW &20000406, &80000405, &20000400, &20000405, &20000404, &20000406
+00009458: 80000405    ; 
+0000945C: 20000400    ; 
+00009460: 20000405    ; 
+00009464: 20000404    ; 
+00009468: 20000406    ; 
+0000946C: 80000405    ;   DEFW &80000405, &20000400, &20000405, &20000404, &20000406, &10000400
+00009470: 20000400    ; 
+00009474: 20000405    ; 
+00009478: 20000404    ; 
+0000947C: 20000406    ; 
+00009480: 10000400    ; 
+00009484: 10000405    ;   DEFW &10000405, &10000406, &10000408, &1000040A, &1000040C, &10000501
+00009488: 10000406    ; 
+0000948C: 10000408    ; 
+00009490: 1000040A    ; 
+00009494: 1000040C    ; 
+00009498: 10000501    ; 
+0000949C: 10000503    ;   DEFW &10000503, &10000505, &10000506, &10000501, &1000040A, &10000405
+000094A0: 10000505    ; 
+000094A4: 10000506    ; 
+000094A8: 10000501    ; 
+000094AC: 1000040A    ; 
+000094B0: 10000405    ; 
+000094B4: 10000403    ;   DEFW &10000403, &10000401, &1000030A, &20000405, &20000403, &20000403
+000094B8: 10000401    ; 
+000094BC: 1000030A    ; 
+000094C0: 20000405    ; 
+000094C4: 20000403    ; 
+000094C8: 20000403    ; 
+000094CC: 20000401    ;   DEFW &20000401, &8000030A, &20000300, &20000306, &20000308, &2000030A
+000094D0: 8000030A    ; 
+000094D4: 20000300    ; 
+000094D8: 20000306    ; 
+000094DC: 20000308    ; 
+000094E0: 2000030A    ; 
+000094E4: 20000309    ;   DEFW &20000309, &20000309, &2000030A, &2000030C, &20000401, &2000030C
+000094E8: 20000309    ; 
+000094EC: 2000030A    ; 
+000094F0: 2000030C    ; 
+000094F4: 20000401    ; 
+000094F8: 2000030C    ; 
+000094FC: 10000401    ;   DEFW &10000401, &20000405, &1000030A, &8000030A, &20000300, &2000030A
+00009500: 20000405    ; 
+00009504: 1000030A    ; 
+00009508: 8000030A    ; 
+0000950C: 20000300    ; 
+00009510: 2000030A    ; 
+00009514: 1000030A    ;   DEFW &1000030A, &1000030C, &15000401, &30000400, &0C000403, &0C000405
+00009518: 1000030C    ; 
+0000951C: 15000401    ; 
+00009520: 30000400    ; 
+00009524: 0C000403    ; 
+00009528: 0C000405    ; 
+0000952C: 0C000406    ;   DEFW &0C000406, &0C000403, &0C000401, &8000030C, &20000405, &20000405
+00009530: 0C000403    ; 
+00009534: 0C000401    ; 
+00009538: 8000030C    ; 
+0000953C: 20000405    ; 
+00009540: 20000405    ; 
+00009544: 20000404    ;   DEFW &20000404, &20000406, &80000405, &20000400, &20000405, &20000404
+00009548: 20000406    ; 
+0000954C: 80000405    ; 
+00009550: 20000400    ; 
+00009554: 20000405    ; 
+00009558: 20000404    ; 
+0000955C: 20000406    ;   DEFW &20000406, &80000405, &20000400, &20000405, &20000404, &20000406
+00009560: 80000405    ; 
+00009564: 20000400    ; 
+00009568: 20000405    ; 
+0000956C: 20000404    ; 
+00009570: 20000406    ; 
+00009574: 10000400    ;   DEFW &10000400, &10000405, &10000406, &10000408, &1000040A, &1000040C
+00009578: 10000405    ; 
+0000957C: 10000406    ; 
+00009580: 10000408    ; 
+00009584: 1000040A    ; 
+00009588: 1000040C    ; 
+0000958C: 10000501    ;   DEFW &10000501, &10000503, &10000505, &10000506, &10000501, &1000040A
+00009590: 10000503    ; 
+00009594: 10000505    ; 
+00009598: 10000506    ; 
+0000959C: 10000501    ; 
+000095A0: 1000040A    ; 
+000095A4: 10000405    ;   DEFW &10000405, &10000403, &10000401, &10000305, &20000405, &20000403
+000095A8: 10000403    ; 
+000095AC: 10000401    ; 
+000095B0: 10000305    ; 
+000095B4: 20000405    ; 
+000095B8: 20000403    ; 
+000095BC: 20000403    ;   DEFW &20000403, &20000401, &8000030A, &20000300, &20000306, &20000308
+000095C0: 20000401    ; 
+000095C4: 8000030A    ; 
+000095C8: 20000300    ; 
+000095CC: 20000306    ; 
+000095D0: 20000308    ; 
+000095D4: 2000030A    ;   DEFW &2000030A, &20000309, &20000309, &2000030A, &2000030C, &20000401
+000095D8: 20000309    ; 
+000095DC: 20000309    ; 
+000095E0: 2000030A    ; 
+000095E4: 2000030C    ; 
+000095E8: 20000401    ; 
+000095EC: 2000030C    ;   DEFW &2000030C, &20000401, &20000405, &8000030A, &20000300, &2000030A
+000095F0: 20000401    ; 
+000095F4: 20000405    ; 
+000095F8: 8000030A    ; 
+000095FC: 20000300    ; 
+00009600: 2000030A    ; 
+00009604: 2000030A    ;   DEFW &2000030A, &2000030C, &20000401, &20000403, &20000405, &0A000406
+00009608: 2000030C    ; 
+0000960C: 20000401    ; 
+00009610: 20000403    ; 
+00009614: 20000405    ; 
+00009618: 0A000406    ; 
+0000961C: 0A000403    ;   DEFW &0A000403, &0A000401, &80000405, &80000405, &4000040A, &30000408
+00009620: 0A000401    ; 
+00009624: 80000405    ; 
+00009628: 80000405    ; 
+0000962C: 4000040A    ; 
+00009630: 30000408    ; 
+00009634: 10000405    ;   DEFW &10000405, &40000405, &1000030A, &10000401, &10000405, &10000408
+00009638: 40000405    ; 
+0000963C: 1000030A    ; 
+00009640: 10000401    ; 
+00009644: 10000405    ; 
+00009648: 10000408    ; 
+0000964C: 20000405    ;   DEFW &20000405, &10000403, &10000401, &10000401, &10000403, &40000405
+00009650: 10000403    ; 
+00009654: 10000401    ; 
+00009658: 10000401    ; 
+0000965C: 10000403    ; 
+00009660: 40000405    ; 
+00009664: 80000405    ;   DEFW &80000405, &4000040A, &30000408, &10000405, &40000405, &2000030A
+00009668: 4000040A    ; 
+0000966C: 30000408    ; 
+00009670: 10000405    ; 
+00009674: 40000405    ; 
+00009678: 2000030A    ; 
+0000967C: 2000030A    ;   DEFW &2000030A, &08000405, &08000408, &10000405, &20000405, &10000403
+00009680: 08000405    ; 
+00009684: 08000408    ; 
+00009688: 10000405    ; 
+0000968C: 20000405    ; 
+00009690: 10000403    ; 
+00009694: 10000401    ;   DEFW &10000401, &10000401, &10000403, &40000405, &80000405, &4000040A
+00009698: 10000401    ; 
+0000969C: 10000403    ; 
+000096A0: 40000405    ; 
+000096A4: 80000405    ; 
+000096A8: 4000040A    ; 
+000096AC: 30000408    ;   DEFW &30000408, &10000405, &40000405, &10000400, &1000030A, &10000405
+000096B0: 10000405    ; 
+000096B4: 40000405    ; 
+000096B8: 10000400    ; 
+000096BC: 1000030A    ; 
+000096C0: 10000405    ; 
+000096C4: 10000408    ;   DEFW &10000408, &40000405, &30000405, &10000403, &80000403, &20000400
+000096C8: 40000405    ; 
+000096CC: 30000405    ; 
+000096D0: 10000403    ; 
+000096D4: 80000403    ; 
+000096D8: 20000400    ; 
+000096DC: 10000403    ;   DEFW &10000403, &10000401, &10000403, &10000405, &10000405, &20000401
+000096E0: 10000401    ; 
+000096E4: 10000403    ; 
+000096E8: 10000405    ; 
+000096EC: 10000405    ; 
+000096F0: 20000401    ; 
+000096F4: 2000030C    ;   DEFW &2000030C, &2000030A, &10000300, &10000401, &10000403, &20000400
+000096F8: 2000030A    ; 
+000096FC: 10000300    ; 
+00009700: 10000401    ; 
+00009704: 10000403    ; 
+00009708: 20000400    ; 
+0000970C: 30000405    ;   DEFW &30000405, &20000405, &10000403, &40000403, &20000408, &20000403
+00009710: 20000405    ; 
+00009714: 10000403    ; 
+00009718: 40000403    ; 
+0000971C: 20000408    ; 
+00009720: 20000403    ; 
+00009724: 60000403    ;   DEFW &60000403, &2000030C, &20000308, &40000401, &2000030A, &10000401
+00009728: 2000030C    ; 
+0000972C: 20000308    ; 
+00009730: 40000401    ; 
+00009734: 2000030A    ; 
+00009738: 10000401    ; 
+0000973C: 1000030A    ;   DEFW &1000030A, &40000403, &40000405, &30000405, &10000403, &80000403
+00009740: 40000403    ; 
+00009744: 40000405    ; 
+00009748: 30000405    ; 
+0000974C: 10000403    ; 
+00009750: 80000403    ; 
+00009754: 20000400    ;   DEFW &20000400, &10000403, &10000401, &10000403, &10000405, &10000405
+00009758: 10000403    ; 
+0000975C: 10000401    ; 
+00009760: 10000403    ; 
+00009764: 10000405    ; 
+00009768: 10000405    ; 
+0000976C: 20000401    ;   DEFW &20000401, &2000030C, &2000030A, &10000300, &10000401, &10000403
+00009770: 2000030C    ; 
+00009774: 2000030A    ; 
+00009778: 10000300    ; 
+0000977C: 10000401    ; 
+00009780: 10000403    ; 
+00009784: 20000400    ;   DEFW &20000400, &30000405, &20000405, &10000403, &40000403, &20000408
+00009788: 30000405    ; 
+0000978C: 20000405    ; 
+00009790: 10000403    ; 
+00009794: 40000403    ; 
+00009798: 20000408    ; 
+0000979C: 20000403    ;   DEFW &20000403, &60000403, &2000030C, &20000308, &20000401, &80000401
+000097A0: 60000403    ; 
+000097A4: 2000030C    ; 
+000097A8: 20000308    ; 
+000097AC: 20000401    ; 
+000097B0: 80000401    ; 
+000097B4: 20000400    ;   DEFW &20000400, &2000040A, &20000409, &20000405, &20000408, &20000407
+000097B8: 2000040A    ; 
+000097BC: 20000409    ; 
+000097C0: 20000405    ; 
+000097C4: 20000408    ; 
+000097C8: 20000407    ; 
+000097CC: 40000400    ;   DEFW &40000400, &20000400, &2000050A, &20000509, &20000505, &20000508
+000097D0: 20000400    ; 
+000097D4: 2000050A    ; 
+000097D8: 20000509    ; 
+000097DC: 20000505    ; 
+000097E0: 20000508    ; 
+000097E4: 20000507    ;   DEFW &20000507, &40000500, &20000500, &2000050A, &20000509, &20000505
+000097E8: 40000500    ; 
+000097EC: 20000500    ; 
+000097F0: 2000050A    ; 
+000097F4: 20000509    ; 
+000097F8: 20000505    ; 
+000097FC: 20000508    ;   DEFW &20000508, &20000507, &20000500, &20000508, &40000509, &2000050A
+00009800: 20000507    ; 
+00009804: 20000500    ; 
+00009808: 20000508    ; 
+0000980C: 40000509    ; 
+00009810: 2000050A    ; 
+00009814: 40000509    ;   DEFW &40000509, &2000050A, &40000509, &00000000
+00009818: 2000050A    ; 
+0000981C: 40000509    ; 
+00009820: 00000000    ; 
+00009824:             ; ;-------------------------------------------------------------------------------
+00009824:             ; 
+00009824:             ; 
+
+Symbol Table: Labels
+: FALSE                             00000000  Value
+: TRUE                              00000001  Value
+: OFFSET_OS                         00000000  Value
+: OFFSET_IRQ                        00007900  Value
+: OFFSET_USER                       00008000  Value
+: OFFSET_ENDRAM                     00027C00  Value
+: PSR_CLR_MODE                      0000001F  Value
+: PSR_USR                           00000010  Value
+: PSR_FIQ                           00000011  Value
+: PSR_IRQ                           00000012  Value
+: PSR_SVC                           00000013  Value
+: PSR_ABT                           00000017  Value
+: PSR_UND                           0000001B  Value
+: PSR_SYS                           0000001F  Value
+: port_area                         10000000  Value
+: port_LCD_DATA                     00000000  Value
+: port_LCD_CTRL                     00000004  Value
+: port_BUTTONS                      00000004  Value
+: port_TIMER                        00000008  Value
+: port_TIMER_CMP                    0000000C  Value
+: port_INT_REQ                      00000018  Value
+: port_INT_EN                       0000001C  Value
+: fpga_area                         20000000  Value
+: BTN_1                             00000008  Value
+: BTN_2                             00000080  Value
+: BTN_3                             00000040  Value
+: BTN_MASK                          000000C8  Value
+: INT_TIMER_CMP                     00000001  Value
+: INT_SPARTAN                       00000002  Value
+: INT_VIRTEX                        00000004  Value
+: INT_ETHERNET                      00000008  Value
+: INT_SERIAL_RR                     00000010  Value
+: INT_SERIAL_TR                     00000020  Value
+: INT_BTN_UPPER                     00000040  Value
+: INT_BTN_LOWER                     00000080  Value
+: BUZZER_ENABLE_MASK                00008000  Value
+: os_exception_table                00000000  Local -- ARM
+: os_tick_count                     00000020  Local -- ARM
+: os_undefined_instruction          00000024  Local -- ARM
+: os_prefetch_abort                 00000028  Local -- ARM
+: os_data_abort                     0000002C  Local -- ARM
+: os_trapper_exception              00000030  Local -- ARM
+: os_fiq                            00000034  Local -- ARM
+: SVC_EXIT                          00000000  Value
+: SVC_LCD_LIGHT                     00000001  Value
+: SVC_LCD_CLEAR                     00000002  Value
+: SVC_LCD_WRITE                     00000003  Value
+: SVC_LCD_WRITE_CHAR                00000004  Value
+: SVC_LCD_SET_CURSOR                00000005  Value
+: SVC_LCD_COMMAND                   00000006  Value
+: SVC_BUZZ_SET                      00000007  Value
+: SVC_KEYPAD_SCAN                   00000008  Value
+: SVC_SVC_COUNT                     00000009  Value
+: os_svc                            00000038  Local -- ARM
+: os_svc_jump                       0000004C  Local -- ARM
+: os_svc_return                     00000060  Local -- ARM
+: os_svc_jumptable                  00000064  Local -- ARM
+: os_irq                            00000088  Local -- ARM
+: os_reset                          000000AC  Local -- ARM
+: os_exit                           00000108  Local -- ARM
+: os_update_tick_count              0000010C  Local -- ARM
+: buzz_set                          00000130  Local -- ARM
+: memset                            0000014C  Local -- ARM
+: memset_loop                       00000150  Local -- ARM
+: has_elapsed_by                    00000164  Local -- ARM
+: has_elapsed_by_return             0000018C  Local -- ARM
+: LCD_E                             00000001  Value
+: LCD_RS                            00000002  Value
+: LCD_RW                            00000004  Value
+: LCD_BACKLIGHT                     00000020  Value
+: LCD_BUSY                          00000080  Value
+: LCD_CMD_CLEAR                     00000001  Value
+: LCD_CMD_SETCUR                    00000080  Value
+: LCD_CHARS_VISIBLE_PER_LINE        00000010  Value
+: LCD_CHARS_PER_LINE                00000040  Value
+: LCD_CHARWRITE                     80000000  Value
+: LCD_SCROLLER_TEXT                 00000000  Offset
+: LCD_SCROLLER_BUFFER               00000100  Offset
+: LCD_SCROLLER_X                    00000110  Offset
+: LCD_SCROLLER_Y                    00000114  Offset
+: LCD_SCROLLER_TEXT_LEN             00000118  Offset
+: LCD_SCROLLER_SIZE                 0000011C  Offset
+: lcd_scroller_init                 00000190  Local -- ARM
+: lcd_scroller_set_text             000001AC  Local -- ARM
+: lcd_scroller_update               000001F0  Local -- ARM
+: lcd_scroller_update_loop          00000210  Local -- ARM
+: lcd_scroller_update_next          00000238  Local -- ARM
+: lcd_scroller_update_end           0000024C  Local -- ARM
+: lcd_scroller_update_save_x        00000270  Local -- ARM
+: lcd_scroller_update_return        00000274  Local -- ARM
+: lcd_setlight                      00000278  Local -- ARM
+: lcd_clear                         00000298  Local -- ARM
+: lcd_putstring                     000002A8  Local -- ARM
+: lcd_putstring_loop                000002B0  Local -- ARM
+: lcd_putchar                       000002C4  Local -- ARM
+: lcd_setcursor_line_offsets        000002DC  Local -- ARM
+: lcd_setcursor                     000002EC  Local -- ARM
+: lcd_command                       00000308  Local -- ARM
+: lcd_wait_until_ready              00000344  Local -- ARM
+: lcd_wait_until_ready_loop         0000035C  Local -- ARM
+: KEYPAD_ROW_1                      00000001  Value
+: KEYPAD_ROW_2                      00000002  Value
+: KEYPAD_ROW_3                      00000004  Value
+: KEYPAD_ROW_4                      00000008  Value
+: KEYPAD_UNKOWN                     00000010  Value
+: KEYPAD_COL_3                      00000020  Value
+: KEYPAD_COL_2                      00000040  Value
+: KEYPAD_COL_1                      00000080  Value
+: KEYPAD_ROWS                       0000000F  Value
+: KEYPAD_COLS                       000000E0  Value
+: KEYPAD_NOBUTTON                   FFFFFFFF  Value
+: KEYPAD_IDX_ASTERISK               00000009  Value
+: KEYPAD_IDX_0                      0000000A  Value
+: KEYPAD_IDX_HASH                   0000000B  Value
+: keypad_variables                  0000037C  Local -- ARM
+: keypad_port                       0000037C  Local -- ARM
+: keypad_button_index_table         00000380  Local -- ARM
+: keypad_ascii_table                0000038C  Local -- ARM
+: keypad_get_new_presses            00000398  Local -- ARM
+: keypad_button_index_to_ascii      000003A4  Local -- ARM
+: keypad_scan_read_index            000003BC  Local -- ARM
+: keypad_scan_read_ascii_loop       000003C8  Local -- ARM
+: keypad_scan_read_ascii_found      000003E8  Local -- ARM
+: keypad_scan                       000003F8  Local -- ARM
+: keypad_scan_loop                  00000414  Local -- ARM
+: udivision                         0000043C  Local -- ARM
+: udivision_loop                    0000044C  Local -- ARM
+: INT2STR_SPACES                    80000000  Value
+: strlen                            0000046C  Local -- ARM
+: strend                            00000480  Local -- ARM
+: strend_loop                       00000484  Local -- ARM
+: appendchar                        00000498  Local -- ARM
+: appendchar_loop                   0000049C  Local -- ARM
+: strcat                            000004B0  Local -- ARM
+: strcpy                            000004C0  Local -- ARM
+: strcpy_loop                       000004C4  Local -- ARM
+: int2str                           000004D8  Local -- ARM
+: int2str_negative_check            000004FC  Local -- ARM
+: int2str_digit_write               00000514  Local -- ARM
+: int2str_digit_write_loop          0000051C  Local -- ARM
+: int2str_digit_finalise            00000534  Local -- ARM
+: int2str_digit_fill                00000544  Local -- ARM
+: int2str_digit_fill_loop           00000558  Local -- ARM
+: int2str_digit_reverse             00000564  Local -- ARM
+: int2str_digit_reverse_loop        00000568  Local -- ARM
+: STATE_ABOUT                       00000000  Value
+: STATE_STOPPED                     00000001  Value
+: STATE_PLAYING                     00000002  Value
+: STATE_FINISHED                    00000003  Value
+: STATE_END                         00000004  Value
+: module_project                    00008000  Local -- ARM
+: module_ui                         00008010  Local -- ARM
+: module_player                     00008358  Local -- ARM
+: main                              0000839C  Local -- ARM
+: MODULE_PROJECT_UI                 00000000  Offset
+: MODULE_PROJECT_PLAYER             00000004  Offset
+: MODULE_PROJECT_MUSIC              00000008  Offset
+: MODULE_PROJECT_STATE              0000000C  Offset
+: MODULE_PROJECT_SIZE               00000010  Offset
+: project_init_music_offset         000083BC  Local -- ARM
+: project_init                      000083C0  Local -- ARM
+: project_run                       000083EC  Local -- ARM
+: project_run_loop                  00008404  Local -- ARM
+: project_run_post_playing_check    00008424  Local -- ARM
+: project_run_post_about_check      00008434  Local -- ARM
+: player_time_periods               00008448  Local -- ARM
+: PLAYER_MAX_CHANNELS               00000002  Value
+: BEATS_PER_BAR                     00000004  Value
+: NOTE_BARFRAC_SHIFT                00000018  Value
+: NOTE_BAR_SHIFT                    00000010  Value
+: NOTE_OCTAVE_SHIFT                 00000008  Value
+: NOTE_KEY_SHIFT                    00000000  Value
+: SEQUENCE_INDEX_END                FFFFFFFF  Value
+: SEQUENCE_END                      00000000  Value
+: MODULE_PLAYER_PROJECT             00000000  Offset
+: MODULE_PLAYER_TRACK_INDEX         00000004  Offset
+: MODULE_PLAYER_TRACK_NAME          00000008  Offset
+: MODULE_PLAYER_TEMPO               0000000C  Offset
+: MODULE_PLAYER_NUM_CHANNELS        00000010  Offset
+: MODULE_PLAYER_LAST_TICK           00000014  Offset
+: MODULE_PLAYER_ELAPSED_TICKS       00000018  Offset
+: MODULE_PLAYER_CHANNELS            0000001C  Offset
+: MODULE_PLAYER_SIZE                00000044  Offset
+: CHANNEL_STATE_INDEX               00000000  Offset
+: CHANNEL_STATE_FINISHED            00000004  Offset
+: CHANNEL_STATE_WAITTIME            00000008  Offset
+: CHANNEL_STATE_SEQINDEX_ADDRESS    0000000C  Offset
+: CHANNEL_STATE_SEQUENCE_ADDRESS    00000010  Offset
+: CHANNEL_STATE_SIZE                00000014  Offset
+: player_init                       000085D8  Local -- ARM
+: player_init_loop                  000085E8  Local -- ARM
+: player_load_track                 00008600  Local -- ARM
+: player_read_track_info            00008630  Local -- ARM
+: player_read_track_channels        00008664  Local -- ARM
+: player_read_track_channels_loop   00008674  Local -- ARM
+: player_read_track_channels_next   00008688  Local -- ARM
+: player_read_track_channels_end    00008694  Local -- ARM
+: player_read_track_channel         00008698  Local -- ARM
+: player_read_track_channel_loop    000086B8  Local -- ARM
+: player_update                     000086D4  Local -- ARM
+: player_tick                       000086EC  Local -- ARM
+: player_tick_return                00008720  Local -- ARM
+: player_update_channels            00008724  Local -- ARM
+: player_update_channels_loop       00008738  Local -- ARM
+: player_update_channels_next       00008754  Local -- ARM
+: player_update_channels_end        00008760  Local -- ARM
+: player_update_channel             00008768  Local -- ARM
+: player_update_channel_return      0000878C  Local -- ARM
+: player_channel_next_note          00008790  Local -- ARM
+: player_channel_next_note_return   000087D0  Local -- ARM
+: player_channel_next_sequence      000087D4  Local -- ARM
+: player_channel_next_sequence_fi   000087FC  Local -- ARM
+: player_channel_next_sequence_re   00008814  Local -- ARM
+: player_channel_load_sequence      00008818  Local -- ARM
+: player_stop_all_channels          00008834  Local -- ARM
+: player_stop_all_channels_loop     00008840  Local -- ARM
+: player_stop_all_channels_return   00008854  Local -- ARM
+: player_stop_note                  00008858  Local -- ARM
+: player_play_note_periods_offset   0000886C  Local -- ARM
+: player_play_note                  00008870  Local -- ARM
+: player_play_note_return           000088AC  Local -- ARM
+: player_get_note_time              000088B0  Local -- ARM
+: MODULE_UI_PROJECT                 00000000  Offset
+: MODULE_UI_SCROLL_SAVETICK         00000004  Offset
+: MODULE_UI_TIME_SAVETICK           00000008  Offset
+: MODULE_UI_LCD_SCROLLERS           0000000C  Offset
+: MODULE_UI_BUFFER                  00000244  Offset
+: MODULE_UI_LAST_KEYPAD_SCAN        00000344  Offset
+: MODULE_UI_SIZE                    00000348  Offset
+: ui_init                           000088E8  Local -- ARM
+: ui_show_about_sz_top              00008920  Local -- ARM
+: ui_show_about_sz_bottom           00008930  Local -- ARM
+: ui_show_about                     00008940  Local -- ARM
+: ui_track_changed                  00008960  Local -- ARM
+: ui_track_updated                  000089C8  Local -- ARM
+: ui_track_updated_return           00008A04  Local -- ARM
+: ui_refresh_time                   00008A0C  Local -- ARM
+: ui_write_time                     00008A5C  Local -- ARM
+: ui_write_state_sz_stopped         00008AA4  Local -- ARM
+: ui_write_state_sz_playing         00008AB0  Local -- ARM
+: ui_write_state                    00008ABC  Local -- ARM
+: ui_handle_input                   00008AD8  Local -- ARM
+: ui_handle_input_about             00008B24  Local -- ARM
+: ui_handle_input_track             00008B40  Local -- ARM
+: ui_handle_input_stop              00008B78  Local -- ARM
+: ui_handle_input_play              00008B98  Local -- ARM
+: ui_handle_input_return            00008BBC  Local -- ARM
+: music_data                        00008BC4  Local -- ARM
+: tl_track_count                    00008BC4  Local -- ARM
+: tl_seq_count                      00008BC8  Local -- ARM
+: tl_tracks                         00008BCC  Local -- ARM
+: tl_seq                            00008BE0  Local -- ARM
+: tl_track_00                       00008C38  Local -- ARM
+: tl_track_01                       00008C7C  Local -- ARM
+: tl_track_02                       00008CB4  Local -- ARM
+: tl_track_03                       00008CD0  Local -- ARM
+: tl_track_04                       00008D24  Local -- ARM
+: tl_seq_0000                       00008D44  Local -- ARM
+: tl_seq_0001                       00008DB4  Local -- ARM
+: tl_seq_0002                       00008E10  Local -- ARM
+: tl_seq_0003                       00008E48  Local -- ARM
+: tl_seq_0004                       00008E8C  Local -- ARM
+: tl_seq_0005                       00008F50  Local -- ARM
+: tl_seq_0006                       00008F80  Local -- ARM
+: tl_seq_0007                       00008FA8  Local -- ARM
+: tl_seq_0008                       00008FC4  Local -- ARM
+: tl_seq_0009                       00008FDC  Local -- ARM
+: tl_seq_0010                       000091D8  Local -- ARM
+: tl_seq_0011                       000092E4  Local -- ARM
+: tl_seq_0012                       000092F8  Local -- ARM
+: tl_seq_0013                       00009300  Local -- ARM
+: tl_seq_0014                       00009318  Local -- ARM
+: tl_seq_0015                       00009330  Local -- ARM
+: tl_seq_0016                       00009350  Local -- ARM
+: tl_seq_0017                       00009368  Local -- ARM
+: tl_seq_0018                       00009390  Local -- ARM
+: tl_seq_0019                       000093AC  Local -- ARM
+: tl_seq_0020                       000093C8  Local -- ARM
+: tl_seq_0021                       000093DC  Local -- ARM

@@ -1,0 +1,38 @@
+﻿/* Scrap brain zone */
+/* http://www.gamemusicthemes.com/pdf/SegaGenesis/Sonic_the_Hedgehog_-_Scrap_Brain_Zone.pdf */
+@scrap_brain:
+%name "Scrap Brain Zone"
+%bpm 140
+%channel
+  scrap_brain_A01
+  scrap_brain_A03
+  scrap_brain_A03
+  scrap_brain_A19
+  scrap_brain_A19
+  scrap_brain_A21
+  scrap_brain_A21
+  scrap_brain_A21
+  scrap_brain_A21
+
+$scrap_brain_A01:
+  A4[1/16] B[1/8] C5[1/16] ~ E5 F G[5/16] E[1/16] D C B4
+  F5[1/16] E D C G F E D A G F E B A G F
+
+$scrap_brain_A03:
+  A5[5/8] G[1/8] F G
+  E5[1/1]
+  G5[5/8] F[1/8] E F
+  D5[1/1]
+  F5[5/8] D#[1/8] D D#
+  C5[1/2] D
+  E5[1/16] F E[3/8] F[1/2]
+  G5[1/2] G#
+
+$scrap_brain_A19:
+  A4[1/16] A G# A G G A A G# G# G G ~[1/4]
+
+$scrap_brain_A21:
+  G5[5/8] E[1/8] C C6
+  A#5[1/4] C6[1/8] A#5[1/4] F[1/8] A# A[3/4]
+  E5[1/8] F G[3/8]
+  A5[1/8] G[3/8] E[1/4]
